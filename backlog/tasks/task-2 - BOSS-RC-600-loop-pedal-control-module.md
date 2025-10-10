@@ -4,12 +4,17 @@ title: BOSS RC-600 loop pedal control module
 status: To Do
 assignee: []
 created_date: '2025-10-10 05:59'
-labels: []
+updated_date: '2025-10-10 10:36'
+labels:
+  - midi
+  - documentation
+  - research
 dependencies: []
 ---
 
 ## Description
 
+<!-- SECTION:DESCRIPTION:BEGIN -->
 This project needs to control a BOSS RC-600 loop pedal via MIDI cc messages. It needs to be able to change as many of the loop parameters as possible.
 
 ## MIDI control capabilities
@@ -47,3 +52,4 @@ Configure one preset on the RC-600 with the 16 most important assigned functions
 
 - Official documentation: https://www.boss.info/global/support/by_product/rc-600/owners_manuals/
 - User discussion: https://forum.morningstar.io/t/anyone-using-mc8-with-boss-rc-600/3514
+<!-- SECTION:DESCRIPTION:END -->
