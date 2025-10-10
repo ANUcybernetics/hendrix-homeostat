@@ -66,7 +66,7 @@ defmodule HendrixHomeostat.MixProject do
       {:nerves_system_rpi3, "~> 1.24", runtime: false, targets: :rpi3},
       {:nerves_system_rpi3a, "~> 1.24", runtime: false, targets: :rpi3a},
       {:nerves_system_rpi4, "~> 1.24", runtime: false, targets: :rpi4},
-      {:nerves_system_rpi5_audio, "~> 0.6", runtime: false, targets: :rpi5, github: "ANUcybernetics/nerves_system_rpi5_audio"},
+      {:nerves_system_rpi5_audio, "~> 0.6", runtime: false, targets: :rpi5, github: "ANUcybernetics/nerves_system_rpi5_audio", nerves: [compile: true]},
       {:nerves_system_bbb, "~> 2.19", runtime: false, targets: :bbb},
       {:nerves_system_osd32mp1, "~> 0.15", runtime: false, targets: :osd32mp1},
       {:nerves_system_x86_64, "~> 1.24", runtime: false, targets: :x86_64},
