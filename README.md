@@ -95,3 +95,9 @@ To start your Nerves app:
 - Ashby, W. R. (1948). "Design for a brain". _Electronic Engineering_, 20,
   379-383
 - Pickering, A. (2010). _The Cybernetic Brain: Sketches of Another Future_
+
+## Licence
+
+Copyright (c) 2025 Ben Swift
+
+Licensed under the MIT License. See LICENSE file for details.
