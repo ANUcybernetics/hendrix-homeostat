@@ -7,22 +7,25 @@ created_date: '2025-10-10 10:31'
 labels:
   - elixir
   - midi
-dependencies: []
+dependencies:
+  - task-27
 priority: high
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Implement MidiController GenServer that sends MIDI commands via the amidi command-line tool. This module wraps System.cmd/3 calls to amidi and provides a clean API for Program Change and Control Change messages. Can be tested independently without audio hardware using 'amidi -l' to verify MIDI device presence.
+Implement MidiController GenServer that sends MIDI commands via MidiBackend behaviour (abstracts amidi or in-memory recording). Provides clean API for Program Change and Control Change messages. Uses behaviour-based backend for testability without hardware. Depends on task-27 (backend abstractions).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MidiController GenServer module created with init/1, handle_call/3, and handle_cast/2 callbacks
-- [ ] #2 Function send_program_change(memory_number) implemented (PC 0-98 for RC-600 memories 1-99)
-- [ ] #3 Function send_control_change(cc_number, value) implemented (CC#1-31, CC#64-95, values 0-127)
-- [ ] #4 Device selection configurable via application config
-- [ ] #5 Graceful error handling when MIDI device not present
-- [ ] #6 Module compiles and can be started under supervision
+- [ ] #1 MidiController GenServer module created with init/1, handle_cast/2 callbacks
+- [ ] #2 Uses MidiBackend behaviour for sending MIDI (injected via config)
+- [ ] #3 Implements `send_program_change(memory_number)` as cast (PC 0-98 for RC-600 memories 1-99)
+- [ ] #4 Implements `send_control_change(cc_number, value)` as cast (CC#1-31, CC#64-95, values 0-127)
+- [ ] #5 State tracks backend, device config, and last sent command (for debugging)
+- [ ] #6 Graceful error handling when backend reports failure (logs error, continues operating)
+- [ ] #7 Device selection configurable via application config
+- [ ] #8 Module compiles and can be started under supervision with both Amidi and InMemory backends
 <!-- AC:END -->

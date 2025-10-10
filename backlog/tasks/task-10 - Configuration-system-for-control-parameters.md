@@ -19,12 +19,15 @@ Create comprehensive configuration system for all tunable parameters in the home
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 config/config.exs includes all threshold values (critical_high, critical_low, comfort_zone_min, comfort_zone_max)
-- [ ] #2 config/config.exs includes timing parameters (poll_interval_ms, anti_stasis_count)
-- [ ] #3 config/config.exs includes patch bank mappings (boost_bank, dampen_bank, random_bank as lists of memory numbers)
-- [ ] #4 config/config.exs includes device settings (midi_device, audio_device, sample_rate, buffer_size)
-- [ ] #5 Configuration module created with accessor functions for type-safe config access
-- [ ] #6 Documentation added to config file explaining each parameter and valid ranges
-- [ ] #7 Default values allow system to run without manual configuration
-- [ ] #8 Configuration compiles and loads without errors
+- [ ] #1 config/runtime.exs created (not config.exs, for Nerves compatibility)
+- [ ] #2 Includes all threshold values (critical_high: 0.8, critical_low: 0.05, comfort_zone_min: 0.2, comfort_zone_max: 0.5)
+- [ ] #3 Includes timing parameters (buffer_size_samples: 4800 for ~10Hz at 48kHz, anti_stasis_count: 20)
+- [ ] #4 Includes patch bank mappings (boost_bank, dampen_bank, random_bank as lists of RC-600 memory numbers)
+- [ ] #5 Includes device settings (midi_device, audio_device, sample_rate: 48000)
+- [ ] #6 Includes backend selection (midi_backend: MidiBackend.Amidi or .InMemory, audio_backend: AudioBackend.Port or .File)
+- [ ] #7 Configuration validated at application startup in Application.start/2
+- [ ] #8 Documentation added explaining each parameter and valid ranges
+- [ ] #9 Default values allow system to run without manual configuration
+- [ ] #10 Configuration compiles and loads without errors
+- [ ] #11 No usage of Mix.env() or other compile-time checks
 <!-- AC:END -->

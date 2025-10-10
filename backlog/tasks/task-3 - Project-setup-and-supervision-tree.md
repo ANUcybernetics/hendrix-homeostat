@@ -22,7 +22,12 @@ Set up the Elixir application structure with a flat supervision tree for the thr
 <!-- AC:BEGIN -->
 - [ ] #1 Application module created with start/2 callback
 - [ ] #2 Supervisor module created with flat child spec for MidiController, AudioMonitor, and ControlLoop
-- [ ] #3 mix.exs configured with required Nerves dependencies
-- [ ] #4 Basic config/config.exs created with placeholder settings for MIDI device, audio device, and control loop parameters
-- [ ] #5 Application compiles without errors
+- [ ] #3 Supervision strategy set to `:one_for_one` with explicit restart strategy
+- [ ] #4 All GenServers registered with explicit names (e.g., `HendrixHomeostat.MidiController`)
+- [ ] #5 Shutdown timeouts configured for graceful Port cleanup (`:shutdown` option)
+- [ ] #6 Startup order documented (MidiController and AudioMonitor can start in any order, ControlLoop depends on both)
+- [ ] #7 mix.exs configured with required Nerves dependencies
+- [ ] #8 Basic config/runtime.exs created with placeholder settings (not config.exs, for Nerves compatibility)
+- [ ] #9 Application compiles without errors
+- [ ] #10 Fix `Mix.target()` usage in application.ex to use runtime config instead
 <!-- AC:END -->

@@ -9,23 +9,25 @@ labels:
   - audio
 dependencies:
   - task-1
+  - task-27
 priority: high
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Implement AudioMonitor GenServer that continuously reads audio input via arecord command-line tool, parses PCM samples, and calculates metrics using AudioAnalysis functions. Provides current metrics to ControlLoop via handle_call. Depends on task-1 completing (custom Nerves system with USB audio support).
+Implement AudioMonitor GenServer that continuously reads audio input via AudioBackend (abstracts arecord or file input), calculates metrics using AudioAnalysis functions, and sends metrics to ControlLoop via message passing. Uses behaviour-based backend for testability. Depends on task-1 (custom Nerves system) and task-27 (backend abstractions).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 AudioMonitor GenServer module created with init/1, handle_call/3, handle_info/3
-- [ ] #2 Spawns Port process running 'arecord' with appropriate parameters (device, format, rate, channels)
-- [ ] #3 Parses binary PCM data from arecord stdout into lists of integer samples
-- [ ] #4 Calls AudioAnalysis functions (calculate_rms, zero_crossing_rate, peak) on sample buffers
-- [ ] #5 Implements get_metrics/0 function returning current RMS, ZCR, and peak values
-- [ ] #6 Handles Port exit and restarts arecord if it crashes
-- [ ] #7 Audio device and parameters configurable via application config
-- [ ] #8 Module compiles and can run on hardware with audio input
+- [ ] #1 AudioMonitor GenServer module created with init/1, handle_info/2
+- [ ] #2 State structure explicitly defined: backend, backend_state, control_loop_pid, last_metrics, config
+- [ ] #3 Uses AudioBackend behaviour for audio input (injected via config)
+- [ ] #4 On receiving audio buffer from backend, calls AudioAnalysis functions (calculate_rms, zero_crossing_rate, peak)
+- [ ] #5 Sends metrics to ControlLoop via `send(control_loop_pid, {:metrics, {rms, zcr, peak}})`
+- [ ] #6 Target update rate ~10Hz (configurable buffer size to achieve this at 48kHz)
+- [ ] #7 Handles backend errors gracefully, logs warnings but continues operating
+- [ ] #8 Audio device and buffer parameters configurable via application config
+- [ ] #9 Module compiles and can run with both File and Port backends
 <!-- AC:END -->
