@@ -1,43 +1,167 @@
 defmodule HendrixHomeostat.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
 
   use Application
 
   @impl true
   def start(_type, _args) do
-    children =
-      [
-        # Children for all targets
-        # Starts a worker by calling: HendrixHomeostat.Worker.start_link(arg)
-        # {HendrixHomeostat.Worker, arg},
-      ] ++ target_children()
+    validate_config!()
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
+    children = [
+      {HendrixHomeostat.MidiController, []},
+      {HendrixHomeostat.AudioMonitor, []},
+      {HendrixHomeostat.ControlLoop, []}
+    ]
+
     opts = [strategy: :one_for_one, name: HendrixHomeostat.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
-  # List all child processes to be supervised
-  if Mix.target() == :host do
-    defp target_children() do
-      [
-        # Children that only run on the host during development or test.
-        # In general, prefer using `config/host.exs` for differences.
-        #
-        # Starts a worker by calling: Host.Worker.start_link(arg)
-        # {Host.Worker, arg},
-      ]
+  defp validate_config! do
+    validate_audio_config!()
+    validate_midi_config!()
+    validate_control_config!()
+    validate_patch_banks_config!()
+    validate_backends_config!()
+  end
+
+  defp validate_audio_config! do
+    audio = Application.fetch_env!(:hendrix_homeostat, :audio)
+
+    unless Keyword.keyword?(audio) do
+      raise "audio configuration must be a keyword list"
     end
-  else
-    defp target_children() do
-      [
-        # Children for all targets except host
-        # Starts a worker by calling: Target.Worker.start_link(arg)
-        # {Target.Worker, arg},
-      ]
+
+    sample_rate = Keyword.fetch!(audio, :sample_rate)
+    buffer_size = Keyword.fetch!(audio, :buffer_size)
+    device_name = Keyword.fetch!(audio, :device_name)
+    update_rate = Keyword.fetch!(audio, :update_rate)
+
+    unless is_integer(sample_rate) and sample_rate > 0 do
+      raise "audio.sample_rate must be a positive integer"
+    end
+
+    unless is_integer(buffer_size) and buffer_size > 0 do
+      raise "audio.buffer_size must be a positive integer"
+    end
+
+    unless is_binary(device_name) do
+      raise "audio.device_name must be a string"
+    end
+
+    unless is_integer(update_rate) and update_rate > 0 do
+      raise "audio.update_rate must be a positive integer"
+    end
+  end
+
+  defp validate_midi_config! do
+    midi = Application.fetch_env!(:hendrix_homeostat, :midi)
+
+    unless Keyword.keyword?(midi) do
+      raise "midi configuration must be a keyword list"
+    end
+
+    device_name = Keyword.fetch!(midi, :device_name)
+    channel = Keyword.fetch!(midi, :channel)
+
+    unless is_binary(device_name) do
+      raise "midi.device_name must be a string"
+    end
+
+    unless is_integer(channel) and channel >= 1 and channel <= 16 do
+      raise "midi.channel must be an integer between 1 and 16"
+    end
+  end
+
+  defp validate_control_config! do
+    control = Application.fetch_env!(:hendrix_homeostat, :control)
+
+    unless Keyword.keyword?(control) do
+      raise "control configuration must be a keyword list"
+    end
+
+    critical_high = Keyword.fetch!(control, :critical_high)
+    comfort_zone_min = Keyword.fetch!(control, :comfort_zone_min)
+    comfort_zone_max = Keyword.fetch!(control, :comfort_zone_max)
+    critical_low = Keyword.fetch!(control, :critical_low)
+    stability_threshold = Keyword.fetch!(control, :stability_threshold)
+    stability_duration = Keyword.fetch!(control, :stability_duration)
+
+    validate_threshold!(:critical_high, critical_high)
+    validate_threshold!(:comfort_zone_min, comfort_zone_min)
+    validate_threshold!(:comfort_zone_max, comfort_zone_max)
+    validate_threshold!(:critical_low, critical_low)
+    validate_threshold!(:stability_threshold, stability_threshold)
+
+    unless is_integer(stability_duration) and stability_duration > 0 do
+      raise "control.stability_duration must be a positive integer (milliseconds)"
+    end
+
+    unless critical_low < comfort_zone_min do
+      raise "control.critical_low must be less than control.comfort_zone_min"
+    end
+
+    unless comfort_zone_min < comfort_zone_max do
+      raise "control.comfort_zone_min must be less than control.comfort_zone_max"
+    end
+
+    unless comfort_zone_max < critical_high do
+      raise "control.comfort_zone_max must be less than control.critical_high"
+    end
+  end
+
+  defp validate_threshold!(name, value) do
+    unless is_float(value) and value >= 0.0 and value <= 1.0 do
+      raise "control.#{name} must be a float between 0.0 and 1.0"
+    end
+  end
+
+  defp validate_patch_banks_config! do
+    patch_banks = Application.fetch_env!(:hendrix_homeostat, :patch_banks)
+
+    unless Keyword.keyword?(patch_banks) do
+      raise "patch_banks configuration must be a keyword list"
+    end
+
+    boost_bank = Keyword.fetch!(patch_banks, :boost_bank)
+    dampen_bank = Keyword.fetch!(patch_banks, :dampen_bank)
+    random_bank = Keyword.fetch!(patch_banks, :random_bank)
+
+    validate_patch_bank!(:boost_bank, boost_bank)
+    validate_patch_bank!(:dampen_bank, dampen_bank)
+    validate_patch_bank!(:random_bank, random_bank)
+  end
+
+  defp validate_patch_bank!(name, bank) do
+    unless is_list(bank) and length(bank) > 0 do
+      raise "patch_banks.#{name} must be a non-empty list"
+    end
+
+    unless Enum.all?(bank, &is_integer/1) do
+      raise "patch_banks.#{name} must contain only integers"
+    end
+
+    unless Enum.all?(bank, &(&1 >= 0 and &1 <= 99)) do
+      raise "patch_banks.#{name} must contain memory numbers between 0 and 99"
+    end
+  end
+
+  defp validate_backends_config! do
+    backends = Application.fetch_env!(:hendrix_homeostat, :backends)
+
+    unless Keyword.keyword?(backends) do
+      raise "backends configuration must be a keyword list"
+    end
+
+    midi_backend = Keyword.fetch!(backends, :midi_backend)
+    audio_backend = Keyword.fetch!(backends, :audio_backend)
+
+    unless is_atom(midi_backend) do
+      raise "backends.midi_backend must be a module name (atom)"
+    end
+
+    unless is_atom(audio_backend) do
+      raise "backends.audio_backend must be a module name (atom)"
     end
   end
 end
