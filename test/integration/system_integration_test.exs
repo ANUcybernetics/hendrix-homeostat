@@ -31,31 +31,11 @@ defmodule HendrixHomeostat.Integration.SystemIntegrationTest do
     }
   end
 
-  describe "end-to-end system integration" do
-    test "silence detection triggers boost bank selection", %{test_data_dir: test_data_dir} do
-      silence_file = Path.join(test_data_dir, "silence.bin")
-      create_silence_file(silence_file, 4800)
-
-      configure_system(silence_file)
-
-      {:ok, _control_pid} = start_supervised(ControlLoop)
-      {:ok, _monitor_pid} = start_supervised(AudioMonitor)
-
-      Process.sleep(200)
-
-      history = InMemory.get_history()
-
-      assert length(history) > 0
-      [{:program_change, _device, patch, _timestamp} | _rest] = history
-      assert patch in [1, 2, 3, 4, 5], "Expected boost bank patch, got #{patch}"
-
-      stop_supervised(AudioMonitor)
-      stop_supervised(ControlLoop)
-      File.rm(silence_file)
-    end
-
-    test "loud audio triggers dampen bank selection", %{test_data_dir: test_data_dir} do
-      loud_file = Path.join(test_data_dir, "loud.bin")
+  describe "threshold crossing tests" do
+    test "critical high threshold (RMS >= 0.8) triggers dampen bank", %{
+      test_data_dir: test_data_dir
+    } do
+      loud_file = Path.join(test_data_dir, "critical_high.bin")
       create_loud_tone_file(loud_file, 4800, amplitude: 30000)
 
       configure_system(loud_file)
@@ -76,8 +56,34 @@ defmodule HendrixHomeostat.Integration.SystemIntegrationTest do
       File.rm(loud_file)
     end
 
-    test "comfortable audio level triggers no action", %{test_data_dir: test_data_dir} do
-      comfortable_file = Path.join(test_data_dir, "comfortable.bin")
+    test "critical low threshold (RMS <= 0.05) triggers boost bank", %{
+      test_data_dir: test_data_dir
+    } do
+      silence_file = Path.join(test_data_dir, "critical_low.bin")
+      create_silence_file(silence_file, 4800)
+
+      configure_system(silence_file)
+
+      {:ok, _control_pid} = start_supervised(ControlLoop)
+      {:ok, _monitor_pid} = start_supervised(AudioMonitor)
+
+      Process.sleep(200)
+
+      history = InMemory.get_history()
+
+      assert length(history) > 0
+      [{:program_change, _device, patch, _timestamp} | _rest] = history
+      assert patch in [1, 2, 3, 4, 5], "Expected boost bank patch, got #{patch}"
+
+      stop_supervised(AudioMonitor)
+      stop_supervised(ControlLoop)
+      File.rm(silence_file)
+    end
+
+    test "comfort zone entry (0.2 <= RMS <= 0.5) triggers no action", %{
+      test_data_dir: test_data_dir
+    } do
+      comfortable_file = Path.join(test_data_dir, "comfort_zone.bin")
       create_comfortable_tone_file(comfortable_file, 4800)
 
       configure_system(comfortable_file)
@@ -96,28 +102,127 @@ defmodule HendrixHomeostat.Integration.SystemIntegrationTest do
       File.rm(comfortable_file)
     end
 
-    test "stable audio triggers anti-stasis random selection", %{test_data_dir: test_data_dir} do
-      stable_file = Path.join(test_data_dir, "stable.bin")
-      create_comfortable_tone_file(stable_file, 4800)
+    test "exactly 0.8 RMS triggers critical high", %{test_data_dir: test_data_dir} do
+      boundary_file = Path.join(test_data_dir, "boundary_high.bin")
+      amplitude = trunc(0.8 * 32768)
+      create_loud_tone_file(boundary_file, 4800, amplitude: amplitude)
 
-      configure_system(stable_file)
+      configure_system(boundary_file)
 
       {:ok, control_pid} = start_supervised(ControlLoop)
-      {:ok, _monitor_pid} = start_supervised(AudioMonitor)
-
-      Process.sleep(200)
 
       InMemory.clear_history()
 
+      send(control_pid, {:metrics, %{rms: 0.8, zcr: 0.5, peak: 0.8}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [10, 11, 12, 13, 14]
+
+      stop_supervised(ControlLoop)
+      File.rm(boundary_file)
+    end
+
+    test "exactly 0.05 RMS triggers critical low", %{test_data_dir: test_data_dir} do
+      boundary_file = Path.join(test_data_dir, "boundary_low.bin")
+      amplitude = trunc(0.05 * 32768)
+      create_loud_tone_file(boundary_file, 4800, amplitude: amplitude)
+
+      configure_system(boundary_file)
+
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.05, zcr: 0.5, peak: 0.05}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [1, 2, 3, 4, 5]
+
+      stop_supervised(ControlLoop)
+      File.rm(boundary_file)
+    end
+
+    test "exactly 0.2 RMS (comfort zone min) triggers no action" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.2, zcr: 0.5, peak: 0.2}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert history == []
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "exactly 0.5 RMS (comfort zone max) triggers no action" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.5, zcr: 0.5, peak: 0.5}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert history == []
+
+      stop_supervised(ControlLoop)
+    end
+  end
+
+  describe "anti-stasis mechanism verification" do
+    test "requires exactly 30 samples before triggering" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
       :sys.replace_state(control_pid, fn state ->
-        metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-        history = List.duplicate(0.3, 30)
-        %{state |
-          metrics_history: history,
-          current_metrics: metrics,
-          last_action_timestamp: System.monotonic_time(:millisecond) - 31_000
+        history = List.duplicate(0.3, 29)
+
+        %{
+          state
+          | metrics_history: history,
+            current_metrics: %{rms: 0.3, zcr: 0.5, peak: 0.4},
+            last_action_timestamp: System.monotonic_time(:millisecond) - 31_000
         }
       end)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.4}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert history == [], "Anti-stasis should not trigger with only 29 samples"
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "triggers after 30 samples with low variance" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      :sys.replace_state(control_pid, fn state ->
+        history = List.duplicate(0.3, 30)
+
+        %{
+          state
+          | metrics_history: history,
+            current_metrics: %{rms: 0.3, zcr: 0.5, peak: 0.4},
+            last_action_timestamp: System.monotonic_time(:millisecond) - 31_000
+        }
+      end)
+
+      InMemory.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.4}})
       Process.sleep(50)
@@ -126,12 +231,618 @@ defmodule HendrixHomeostat.Integration.SystemIntegrationTest do
 
       assert length(history) == 1
       [{:program_change, _device, patch, _timestamp}] = history
-      assert patch in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29],
-             "Expected random bank patch, got #{patch}"
+      assert patch in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "requires stability duration of 30 seconds" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      :sys.replace_state(control_pid, fn state ->
+        history = List.duplicate(0.3, 30)
+
+        %{
+          state
+          | metrics_history: history,
+            current_metrics: %{rms: 0.3, zcr: 0.5, peak: 0.4},
+            last_action_timestamp: System.monotonic_time(:millisecond) - 29_000
+        }
+      end)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.4}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert history == [], "Anti-stasis should not trigger before 30 seconds elapsed"
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "triggers when stability duration exactly 30 seconds" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      :sys.replace_state(control_pid, fn state ->
+        history = List.duplicate(0.3, 30)
+
+        %{
+          state
+          | metrics_history: history,
+            current_metrics: %{rms: 0.3, zcr: 0.5, peak: 0.4},
+            last_action_timestamp: System.monotonic_time(:millisecond) - 30_000
+        }
+      end)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.4}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "variance calculation prevents false triggers" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      varying_history = [
+        0.3,
+        0.35,
+        0.25,
+        0.4,
+        0.2,
+        0.45,
+        0.3,
+        0.35,
+        0.25,
+        0.4,
+        0.3,
+        0.35,
+        0.25,
+        0.4,
+        0.2,
+        0.45,
+        0.3,
+        0.35,
+        0.25,
+        0.4,
+        0.3,
+        0.35,
+        0.25,
+        0.4,
+        0.2,
+        0.45,
+        0.3,
+        0.35,
+        0.25,
+        0.4
+      ]
+
+      :sys.replace_state(control_pid, fn state ->
+        %{
+          state
+          | metrics_history: varying_history,
+            current_metrics: %{rms: 0.3, zcr: 0.5, peak: 0.4},
+            last_action_timestamp: System.monotonic_time(:millisecond) - 31_000
+        }
+      end)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.4}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert history == [], "High variance should prevent anti-stasis trigger"
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "triggers with nil last_action_timestamp" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      :sys.replace_state(control_pid, fn state ->
+        history = List.duplicate(0.3, 30)
+
+        %{
+          state
+          | metrics_history: history,
+            current_metrics: %{rms: 0.3, zcr: 0.5, peak: 0.4},
+            last_action_timestamp: nil
+        }
+      end)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.4}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "selects random patch from random bank" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      patches =
+        for _ <- 1..20 do
+          :sys.replace_state(control_pid, fn state ->
+            history = List.duplicate(0.3, 30)
+
+            %{
+              state
+              | metrics_history: history,
+                current_metrics: %{rms: 0.3, zcr: 0.5, peak: 0.4},
+                last_action_timestamp: nil
+            }
+          end)
+
+          InMemory.clear_history()
+
+          send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.4}})
+          Process.sleep(50)
+
+          [{:program_change, _device, patch, _timestamp}] = InMemory.get_history()
+          patch
+        end
+
+      unique_patches = Enum.uniq(patches)
+
+      assert length(unique_patches) > 1, "Should select different patches randomly"
+      assert Enum.all?(patches, fn p -> p in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29] end)
+
+      stop_supervised(ControlLoop)
+    end
+  end
+
+  describe "edge cases and boundary conditions" do
+    test "rapid threshold crossings reset history correctly" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      Process.sleep(50)
+
+      state1 = :sys.get_state(control_pid)
+      assert state1.metrics_history == []
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+
+      state2 = :sys.get_state(control_pid)
+      assert length(state2.metrics_history) == 1
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+
+      state3 = :sys.get_state(control_pid)
+      assert state3.metrics_history == []
+
+      history = InMemory.get_history()
+      assert length(history) == 2
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "comfort zone to critical high transition" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
+      send(control_pid, {:metrics, %{rms: 0.4, zcr: 0.5, peak: 0.4}})
+      Process.sleep(100)
+
+      state1 = :sys.get_state(control_pid)
+      assert length(state1.metrics_history) == 3
+      assert InMemory.get_history() == []
+
+      send(control_pid, {:metrics, %{rms: 0.85, zcr: 0.5, peak: 0.85}})
+      Process.sleep(50)
+
+      state2 = :sys.get_state(control_pid)
+      assert state2.metrics_history == []
+
+      history = InMemory.get_history()
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [10, 11, 12, 13, 14]
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "comfort zone to critical low transition" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      send(control_pid, {:metrics, %{rms: 0.25, zcr: 0.5, peak: 0.25}})
+      Process.sleep(100)
+
+      state1 = :sys.get_state(control_pid)
+      assert length(state1.metrics_history) == 2
+      assert InMemory.get_history() == []
+
+      send(control_pid, {:metrics, %{rms: 0.02, zcr: 0.5, peak: 0.02}})
+      Process.sleep(50)
+
+      state2 = :sys.get_state(control_pid)
+      assert state2.metrics_history == []
+
+      history = InMemory.get_history()
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [1, 2, 3, 4, 5]
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "metrics outside all zones default to no action" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.6, zcr: 0.5, peak: 0.6}})
+      Process.sleep(50)
+
+      state = :sys.get_state(control_pid)
+      assert length(state.metrics_history) == 1
+
+      history = InMemory.get_history()
+      assert history == []
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "history is capped at 30 samples" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      for i <- 1..50 do
+        rms = 0.3 + rem(i, 10) * 0.001
+        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
+        Process.sleep(10)
+      end
+
+      state = :sys.get_state(control_pid)
+      assert length(state.metrics_history) == 30
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "zero RMS triggers critical low" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.0, zcr: 0.0, peak: 0.0}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [1, 2, 3, 4, 5]
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "maximum RMS (1.0) triggers critical high" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 1.0, zcr: 0.5, peak: 1.0}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [10, 11, 12, 13, 14]
+
+      stop_supervised(ControlLoop)
+    end
+  end
+
+  describe "system behavior over time" do
+    test "multiple control decisions in sequence maintain state correctly" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+
+      state1 = :sys.get_state(control_pid)
+      assert state1.current_state == :quiet
+      assert state1.last_action_timestamp != nil
+      assert state1.metrics_history == []
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+
+      state2 = :sys.get_state(control_pid)
+      assert state2.current_state == :comfortable
+      assert length(state2.metrics_history) == 1
+
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      Process.sleep(50)
+
+      state3 = :sys.get_state(control_pid)
+      assert state3.current_state == :loud
+      assert state3.last_action_timestamp != nil
+      assert state3.metrics_history == []
+
+      history = InMemory.get_history()
+      assert length(history) == 2
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "system settles after perturbation" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      for _ <- 1..10 do
+        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+        Process.sleep(20)
+      end
+
+      state1 = :sys.get_state(control_pid)
+      history_before = length(state1.metrics_history)
+
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      Process.sleep(50)
+
+      state2 = :sys.get_state(control_pid)
+      assert state2.metrics_history == []
+      assert state2.current_state == :loud
+
+      for _ <- 1..5 do
+        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+        Process.sleep(20)
+      end
+
+      state3 = :sys.get_state(control_pid)
+      assert length(state3.metrics_history) == 5
+      assert state3.current_state == :comfortable
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "long-running stability detection with gradual build-up" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      for i <- 1..30 do
+        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+        Process.sleep(20)
+
+        state = :sys.get_state(control_pid)
+        assert length(state.metrics_history) == i
+        assert InMemory.get_history() == []
+      end
+
+      :sys.replace_state(control_pid, fn state ->
+        %{state | last_action_timestamp: System.monotonic_time(:millisecond) - 31_000}
+      end)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+      assert length(history) == 1
+
+      state = :sys.get_state(control_pid)
+      assert state.metrics_history == []
+      assert state.current_state == :stable
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "state transitions update current_state correctly" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :quiet
+
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :loud
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :comfortable
+
+      :sys.replace_state(control_pid, fn state ->
+        history = List.duplicate(0.3, 30)
+        %{state | metrics_history: history, last_action_timestamp: nil}
+      end)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :stable
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "timestamp updates correctly on each action" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+
+      state1 = :sys.get_state(control_pid)
+      timestamp1 = state1.last_action_timestamp
+      assert timestamp1 != nil
+
+      Process.sleep(100)
+
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      Process.sleep(50)
+
+      state2 = :sys.get_state(control_pid)
+      timestamp2 = state2.last_action_timestamp
+      assert timestamp2 > timestamp1
+
+      stop_supervised(ControlLoop)
+    end
+  end
+
+  describe "complete control loop validation" do
+    test "all control algorithm branches are exercised", %{test_data_dir: test_data_dir} do
+      test_file = Path.join(test_data_dir, "all_branches.bin")
+      create_comfortable_tone_file(test_file, 4800)
+
+      configure_system(test_file)
+
+      {:ok, control_pid} = start_supervised(ControlLoop)
+      {:ok, _monitor_pid} = start_supervised(AudioMonitor)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :loud
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :quiet
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :comfortable
+
+      send(control_pid, {:metrics, %{rms: 0.6, zcr: 0.5, peak: 0.6}})
+      Process.sleep(50)
+      state = :sys.get_state(control_pid)
+      assert length(state.metrics_history) == 2
+
+      :sys.replace_state(control_pid, fn s ->
+        %{s | metrics_history: List.duplicate(0.3, 30), last_action_timestamp: nil}
+      end)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+      assert :sys.get_state(control_pid).current_state == :stable
+
+      history = InMemory.get_history()
+
+      dampen = Enum.filter(history, fn {_, _, p, _} -> p in [10, 11, 12, 13, 14] end)
+      boost = Enum.filter(history, fn {_, _, p, _} -> p in [1, 2, 3, 4, 5] end)
+
+      random =
+        Enum.filter(history, fn {_, _, p, _} -> p in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29] end)
+
+      assert length(dampen) == 1, "Critical high branch not triggered"
+      assert length(boost) == 1, "Critical low branch not triggered"
+      assert length(random) == 1, "Anti-stasis branch not triggered"
 
       stop_supervised(AudioMonitor)
       stop_supervised(ControlLoop)
-      File.rm(stable_file)
+      File.rm(test_file)
+    end
+
+    test "MIDI commands match expected decisions for each state" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      test_scenarios = [
+        {%{rms: 0.9, zcr: 0.5, peak: 0.9}, [10, 11, 12, 13, 14], "dampen"},
+        {%{rms: 0.01, zcr: 0.5, peak: 0.01}, [1, 2, 3, 4, 5], "boost"}
+      ]
+
+      for {metrics, expected_patches, label} <- test_scenarios do
+        InMemory.clear_history()
+
+        send(control_pid, {:metrics, metrics})
+        Process.sleep(50)
+
+        history = InMemory.get_history()
+
+        assert length(history) == 1, "Expected one MIDI command for #{label}"
+        [{:program_change, _device, patch, _timestamp}] = history
+        assert patch in expected_patches, "Expected #{label} patch, got #{patch}"
+      end
+
+      :sys.replace_state(control_pid, fn state ->
+        %{state | metrics_history: List.duplicate(0.3, 30), last_action_timestamp: nil}
+      end)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 1
+      [{:program_change, _device, patch, _timestamp}] = history
+      assert patch in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+
+      stop_supervised(ControlLoop)
+    end
+
+    test "history reset occurs for all critical threshold crossings" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
+      send(control_pid, {:metrics, %{rms: 0.4, zcr: 0.5, peak: 0.4}})
+      Process.sleep(100)
+
+      state1 = :sys.get_state(control_pid)
+      assert length(state1.metrics_history) == 3
+
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      Process.sleep(50)
+
+      state2 = :sys.get_state(control_pid)
+      assert state2.metrics_history == [], "History should reset on critical high"
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
+      Process.sleep(100)
+
+      state3 = :sys.get_state(control_pid)
+      assert length(state3.metrics_history) == 2
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+
+      state4 = :sys.get_state(control_pid)
+      assert state4.metrics_history == [], "History should reset on critical low"
+
+      :sys.replace_state(control_pid, fn s ->
+        %{s | metrics_history: List.duplicate(0.3, 30), last_action_timestamp: nil}
+      end)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+
+      state5 = :sys.get_state(control_pid)
+      assert state5.metrics_history == [], "History should reset on anti-stasis"
+
+      stop_supervised(ControlLoop)
     end
   end
 
@@ -246,7 +957,9 @@ defmodule HendrixHomeostat.Integration.SystemIntegrationTest do
       assert length(history) >= 2, "Expected at least 2 transitions"
 
       boost_patches = Enum.filter(history, fn {_, _, patch, _} -> patch in [1, 2, 3, 4, 5] end)
-      dampen_patches = Enum.filter(history, fn {_, _, patch, _} -> patch in [10, 11, 12, 13, 14] end)
+
+      dampen_patches =
+        Enum.filter(history, fn {_, _, patch, _} -> patch in [10, 11, 12, 13, 14] end)
 
       assert length(boost_patches) > 0, "Expected boost patch for silence"
       assert length(dampen_patches) > 0, "Expected dampen patch for loud audio"
