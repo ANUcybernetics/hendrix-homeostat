@@ -62,7 +62,7 @@ defmodule ManualIntegrationTest do
     IO.puts("  ✓ AudioMonitor has handle_info/2 callback")
 
     source = File.read!("lib/hendrix_homeostat/audio_monitor.ex")
-    assert source =~ "send(state.control_loop_pid, {:metrics, metrics})"
+    assert source =~ "send(pid, {:metrics, metrics})"
     IO.puts("  ✓ AudioMonitor sends {:metrics, map} to ControlLoop")
   end
 

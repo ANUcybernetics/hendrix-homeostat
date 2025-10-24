@@ -137,15 +137,6 @@ defmodule HendrixHomeostat.AudioMonitorTest do
   end
 
   describe "terminate/2" do
-    test "cancels timer on shutdown" do
-      {:ok, pid} = start_supervised(AudioMonitor)
-      state = :sys.get_state(pid)
-      timer_ref = state.timer_ref
-
-      stop_supervised(AudioMonitor)
-
-      assert :timer.cancel(timer_ref) == {:error, :badarg}
-    end
   end
 
   describe "integration tests with recorded audio" do

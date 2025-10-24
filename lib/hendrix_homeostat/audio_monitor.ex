@@ -72,7 +72,14 @@ defmodule HendrixHomeostat.AudioMonitor do
     case state.backend.read_buffer(state.backend_pid) do
       {:ok, buffer} ->
         metrics = AudioAnalysis.calculate_metrics(buffer, format: state.format)
-        send(state.control_loop_pid, {:metrics, metrics})
+
+        case Process.whereis(state.control_loop_pid) do
+          nil ->
+            Logger.warning("ControlLoop process not found, skipping metrics")
+
+          pid ->
+            send(pid, {:metrics, metrics})
+        end
 
         {:noreply, %{state | last_metrics: metrics}}
 

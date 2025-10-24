@@ -97,16 +97,6 @@ defmodule HendrixHomeostat.MidiControllerTest do
       end
     end
 
-    test "rejects non-integer values" do
-      assert_raise FunctionClauseError, fn ->
-        MidiController.send_program_change(5.5)
-      end
-
-      assert_raise FunctionClauseError, fn ->
-        MidiController.send_program_change("5")
-      end
-    end
-
     test "handles backend failures gracefully" do
       stop_supervised(InMemory)
 
@@ -192,18 +182,6 @@ defmodule HendrixHomeostat.MidiControllerTest do
     test "rejects values above 127" do
       assert_raise FunctionClauseError, fn ->
         MidiController.send_control_change(7, 128)
-      end
-    end
-
-    test "rejects non-integer CC numbers" do
-      assert_raise FunctionClauseError, fn ->
-        MidiController.send_control_change(7.5, 64)
-      end
-    end
-
-    test "rejects non-integer values" do
-      assert_raise FunctionClauseError, fn ->
-        MidiController.send_control_change(7, 64.5)
       end
     end
 

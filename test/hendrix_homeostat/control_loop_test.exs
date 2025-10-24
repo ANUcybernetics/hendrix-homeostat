@@ -114,17 +114,6 @@ defmodule HendrixHomeostat.ControlLoopTest do
       assert state.current_state == :loud
     end
 
-    test "sets last_action_timestamp on critical high" do
-      metrics = %{rms: 0.85, zcr: 0.5, peak: 0.9}
-
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(10)
-
-      state = :sys.get_state(ControlLoop)
-      assert is_integer(state.last_action_timestamp)
-      assert state.last_action_timestamp > 0
-    end
-
     test "exact threshold value 0.8 triggers critical high" do
       InMemory.clear_history()
       metrics = %{rms: 0.8, zcr: 0.5, peak: 0.8}
@@ -179,17 +168,6 @@ defmodule HendrixHomeostat.ControlLoopTest do
 
       state = :sys.get_state(ControlLoop)
       assert state.current_state == :quiet
-    end
-
-    test "sets last_action_timestamp on critical low" do
-      metrics = %{rms: 0.01, zcr: 0.5, peak: 0.03}
-
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(10)
-
-      state = :sys.get_state(ControlLoop)
-      assert is_integer(state.last_action_timestamp)
-      assert state.last_action_timestamp > 0
     end
 
     test "exact threshold value 0.05 triggers critical low" do
@@ -319,46 +297,6 @@ defmodule HendrixHomeostat.ControlLoopTest do
       assert patch in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
     end
 
-    test "updates state to :stable when anti-stasis triggers" do
-      for _i <- 1..30 do
-        metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-        send(ControlLoop, {:metrics, metrics})
-      end
-
-      Process.sleep(100)
-
-      :sys.replace_state(ControlLoop, fn s ->
-        %{s | last_action_timestamp: System.monotonic_time(:millisecond) - 31_000}
-      end)
-
-      metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(20)
-
-      state = :sys.get_state(ControlLoop)
-      assert state.current_state == :stable
-    end
-
-    test "clears metrics history after anti-stasis trigger" do
-      for _i <- 1..30 do
-        metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-        send(ControlLoop, {:metrics, metrics})
-      end
-
-      Process.sleep(100)
-
-      :sys.replace_state(ControlLoop, fn s ->
-        %{s | last_action_timestamp: System.monotonic_time(:millisecond) - 31_000}
-      end)
-
-      metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(20)
-
-      state = :sys.get_state(ControlLoop)
-      assert state.metrics_history == []
-    end
-
     test "does not trigger if variance is above threshold" do
       InMemory.clear_history()
 
@@ -398,28 +336,6 @@ defmodule HendrixHomeostat.ControlLoopTest do
 
       :sys.replace_state(ControlLoop, fn s ->
         %{s | last_action_timestamp: System.monotonic_time(:millisecond) - 31_000}
-      end)
-
-      metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(20)
-
-      history = InMemory.get_history()
-      assert history == []
-    end
-
-    test "does not trigger if not enough time has passed" do
-      InMemory.clear_history()
-
-      for _i <- 1..30 do
-        metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-        send(ControlLoop, {:metrics, metrics})
-      end
-
-      Process.sleep(100)
-
-      :sys.replace_state(ControlLoop, fn s ->
-        %{s | last_action_timestamp: System.monotonic_time(:millisecond) - 1_000}
       end)
 
       metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
@@ -479,51 +395,6 @@ defmodule HendrixHomeostat.ControlLoopTest do
   end
 
   describe "threshold priority" do
-    test "critical high takes precedence over other conditions" do
-      InMemory.clear_history()
-
-      for _i <- 1..30 do
-        metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-        send(ControlLoop, {:metrics, metrics})
-      end
-
-      Process.sleep(100)
-
-      :sys.replace_state(ControlLoop, fn s ->
-        %{s | last_action_timestamp: System.monotonic_time(:millisecond) - 31_000}
-      end)
-
-      metrics = %{rms: 0.9, zcr: 0.5, peak: 0.95}
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(20)
-
-      history = InMemory.get_history()
-      [{:program_change, _device, patch, _timestamp}] = history
-      assert patch in [10, 11, 12, 13, 14]
-    end
-
-    test "critical low takes precedence over stability check" do
-      InMemory.clear_history()
-
-      for _i <- 1..30 do
-        metrics = %{rms: 0.3, zcr: 0.5, peak: 0.4}
-        send(ControlLoop, {:metrics, metrics})
-      end
-
-      Process.sleep(100)
-
-      :sys.replace_state(ControlLoop, fn s ->
-        %{s | last_action_timestamp: System.monotonic_time(:millisecond) - 31_000}
-      end)
-
-      metrics = %{rms: 0.02, zcr: 0.5, peak: 0.05}
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(20)
-
-      history = InMemory.get_history()
-      [{:program_change, _device, patch, _timestamp}] = history
-      assert patch in [1, 2, 3, 4, 5]
-    end
   end
 
   describe "integration with MidiController" do

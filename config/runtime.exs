@@ -62,7 +62,7 @@ else
       channels: 6
     ],
     midi: [
-      device_name: "/dev/snd/midiC0D0",
+      device_name: "hw:0,0,0",
       channel: 1
     ],
     control: [
