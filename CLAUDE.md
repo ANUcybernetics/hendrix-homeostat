@@ -42,45 +42,47 @@ running on Raspberry Pi 5 to control a guitar feedback loop system.
 - test audio processing logic on `:host` target when possible before burning to
   device
 
-### Remote access to target device
-
-Use the ht-mcp server for interactive SSH sessions to the target device:
-
-```elixir
-# Create an SSH session (opens live terminal preview in browser)
-mcp__ht-mcp__ht_create_session(command: ["ssh", "nerves.local"], enableWebServer: true)
-
-# Take a snapshot to see current terminal state
-mcp__ht-mcp__ht_take_snapshot(sessionId: "session-id")
-
-# Send commands to the terminal
-mcp__ht-mcp__ht_send_keys(sessionId: "session-id", keys: ["cmd(\"arecord -l\")", "Enter"])
-
-# Execute commands directly and get output
-mcp__ht-mcp__ht_execute_command(sessionId: "session-id", command: "ls /dev/snd")
-```
-
-The live terminal preview URL is provided when creating the session.
-
 ## Testing
 
 This project uses a backend abstraction pattern to enable testing on host
 without hardware.
 
-### Running tests
+### Running tests on host
+
+Most tests run on host without requiring hardware:
 
 ```bash
-# Run all tests on host (default)
-mix test
+# Run all tests on host (default, works in standard shell)
+MIX_TARGET=host mix test
 
 # Run specific test file
-mix test test/path/to/test.exs
+MIX_TARGET=host mix test test/path/to/test.exs
 
 # Run integration tests only
-mix test test/integration/
+MIX_TARGET=host mix test test/integration/
+```
 
-# On target hardware with real devices (when needed)
+### Running tests on target device
+
+Target-only tests require real hardware and must be run on the Raspberry Pi. Use
+the ht-mcp server for interactive SSH sessions:
+
+```bash
+# On target hardware with real devices
 MIX_TARGET=rpi5 mix test --include target_only
+```
+
+To run commands (tests, IEx sessions, etc.) on the target device, use ht-mcp:
+
+```elixir
+# Create an SSH session to the target
+mcp__ht-mcp__ht_create_session(command: ["ssh", "nerves.local"], enableWebServer: true)
+
+# Execute commands on the target
+mcp__ht-mcp__ht_execute_command(sessionId: "session-id", command: "mix test --only target_only")
+
+# Or start an IEx session
+mcp__ht-mcp__ht_send_keys(sessionId: "session-id", keys: ["iex -S mix", "Enter"])
 ```
 
 ### Test types
