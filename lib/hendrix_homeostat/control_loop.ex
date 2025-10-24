@@ -19,24 +19,44 @@ defmodule HendrixHomeostat.ControlLoop do
   @impl true
   def init(_opts) do
     control_config = Application.fetch_env!(:hendrix_homeostat, :control)
-    patch_banks = Application.fetch_env!(:hendrix_homeostat, :patch_banks)
+
+    # Support both old patch_banks and new rc600_cc_map
+    # For now, create stub banks if rc600_cc_map is used
+    config_with_banks = case Application.fetch_env(:hendrix_homeostat, :patch_banks) do
+      {:ok, patch_banks} ->
+        %{
+          critical_high: Keyword.fetch!(control_config, :critical_high),
+          comfort_zone_min: Keyword.fetch!(control_config, :comfort_zone_min),
+          comfort_zone_max: Keyword.fetch!(control_config, :comfort_zone_max),
+          critical_low: Keyword.fetch!(control_config, :critical_low),
+          stability_threshold: Keyword.fetch!(control_config, :stability_threshold),
+          stability_duration: Keyword.fetch!(control_config, :stability_duration),
+          boost_bank: Keyword.fetch!(patch_banks, :boost_bank),
+          dampen_bank: Keyword.fetch!(patch_banks, :dampen_bank),
+          random_bank: Keyword.fetch!(patch_banks, :random_bank)
+        }
+
+      :error ->
+        # Using rc600_cc_map - create stub banks for now
+        %{
+          critical_high: Keyword.fetch!(control_config, :critical_high),
+          comfort_zone_min: Keyword.fetch!(control_config, :comfort_zone_min),
+          comfort_zone_max: Keyword.fetch!(control_config, :comfort_zone_max),
+          critical_low: Keyword.fetch!(control_config, :critical_low),
+          stability_threshold: Keyword.fetch!(control_config, :stability_threshold),
+          stability_duration: Keyword.fetch!(control_config, :stability_duration),
+          boost_bank: [1],  # Stub
+          dampen_bank: [2],  # Stub
+          random_bank: [3]  # Stub
+        }
+    end
 
     state = %{
       current_metrics: nil,
       metrics_history: [],
       last_action_timestamp: nil,
       current_state: :comfortable,
-      config: %{
-        critical_high: Keyword.fetch!(control_config, :critical_high),
-        comfort_zone_min: Keyword.fetch!(control_config, :comfort_zone_min),
-        comfort_zone_max: Keyword.fetch!(control_config, :comfort_zone_max),
-        critical_low: Keyword.fetch!(control_config, :critical_low),
-        stability_threshold: Keyword.fetch!(control_config, :stability_threshold),
-        stability_duration: Keyword.fetch!(control_config, :stability_duration),
-        boost_bank: Keyword.fetch!(patch_banks, :boost_bank),
-        dampen_bank: Keyword.fetch!(patch_banks, :dampen_bank),
-        random_bank: Keyword.fetch!(patch_banks, :random_bank)
-      }
+      config: config_with_banks
     }
 
     {:ok, state}

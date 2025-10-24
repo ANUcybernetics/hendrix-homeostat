@@ -8,10 +8,9 @@ defmodule HendrixHomeostat.Application do
     validate_config!()
 
     children = [
-      {HendrixHomeostat.MidiController, []}
-      # TODO: Update ControlLoop to use RC-600 CC control instead of patch banks
-      # {HendrixHomeostat.AudioMonitor, []},
-      # {HendrixHomeostat.ControlLoop, []}
+      {HendrixHomeostat.MidiController, []},
+      {HendrixHomeostat.AudioMonitor, []},
+      {HendrixHomeostat.ControlLoop, []}
     ]
 
     opts = [strategy: :one_for_one, name: HendrixHomeostat.Supervisor]

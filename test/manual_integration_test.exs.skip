@@ -138,24 +138,22 @@ defmodule ManualIntegrationTest do
     assert control_loop_source =~ "send_program_change"
     IO.puts("  ✓ ControlLoop sends MIDI commands based on decisions")
 
-    integration_test_exists = File.exists?("test/integration/system_integration_test.exs")
+    integration_test_exists = File.exists?("test/integration/control_invariants_test.exs")
     assert integration_test_exists
     IO.puts("  ✓ Integration test file created")
 
-    integration_test_source = File.read!("test/integration/system_integration_test.exs")
-    assert integration_test_source =~ "threshold crossing"
-    assert integration_test_source =~ "anti-stasis"
+    integration_test_source = File.read!("test/integration/control_invariants_test.exs")
+    assert integration_test_source =~ "extreme"
+    assert integration_test_source =~ "comfort zone"
     assert integration_test_source =~ "ControlLoop"
     assert integration_test_source =~ "MidiController"
     IO.puts("  ✓ Integration tests cover control scenarios")
 
-    assert integration_test_source =~ "AudioBackend"
-    assert integration_test_source =~ "MidiBackend"
+    assert integration_test_source =~ "InMemory"
     IO.puts("  ✓ Integration tests use backend abstractions")
 
-    assert integration_test_source =~ "configure_system"
-    assert integration_test_source =~ "create_silence"
-    assert integration_test_source =~ "create_loud_tone"
+    assert integration_test_source =~ "valid MIDI"
+    assert integration_test_source =~ "bounded history"
     IO.puts("  ✓ Integration test helper functions exist")
   end
 

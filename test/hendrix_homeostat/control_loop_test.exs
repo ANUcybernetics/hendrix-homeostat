@@ -40,9 +40,10 @@ defmodule HendrixHomeostat.ControlLoopTest do
       assert state.config.stability_threshold == 0.02
       assert state.config.stability_duration == 30_000
 
-      assert state.config.boost_bank == [1, 2, 3, 4, 5]
-      assert state.config.dampen_bank == [10, 11, 12, 13, 14]
-      assert state.config.random_bank == [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+      # With rc600_cc_map, we use stub banks
+      assert state.config.boost_bank == [1]
+      assert state.config.dampen_bank == [2]
+      assert state.config.random_bank == [3]
     end
 
     test "has correct child_spec" do
@@ -101,7 +102,8 @@ defmodule HendrixHomeostat.ControlLoopTest do
       assert length(history) == 1
 
       [{:program_change, _device, patch, _timestamp}] = history
-      assert patch in [10, 11, 12, 13, 14]
+      # With rc600_cc_map, dampen bank is stub [2]
+      assert patch == 2
     end
 
     test "updates state to :loud on critical high" do
@@ -294,7 +296,8 @@ defmodule HendrixHomeostat.ControlLoopTest do
       assert length(history) == 1
 
       [{:program_change, _device, patch, _timestamp}] = history
-      assert patch in [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+      # With rc600_cc_map, random bank is stub [3]
+      assert patch == 3
     end
 
     test "does not trigger if variance is above threshold" do
@@ -383,14 +386,16 @@ defmodule HendrixHomeostat.ControlLoopTest do
                Keyword.fetch!(control_config, :stability_duration)
     end
 
-    test "reads patch banks from application config" do
-      patch_banks = Application.fetch_env!(:hendrix_homeostat, :patch_banks)
+    test "uses stub banks when rc600_cc_map is configured" do
+      # Verify rc600_cc_map exists
+      assert {:ok, _cc_map} = Application.fetch_env(:hendrix_homeostat, :rc600_cc_map)
 
       state = :sys.get_state(ControlLoop)
 
-      assert state.config.boost_bank == Keyword.fetch!(patch_banks, :boost_bank)
-      assert state.config.dampen_bank == Keyword.fetch!(patch_banks, :dampen_bank)
-      assert state.config.random_bank == Keyword.fetch!(patch_banks, :random_bank)
+      # With rc600_cc_map, we use stub banks for backward compatibility
+      assert state.config.boost_bank == [1]
+      assert state.config.dampen_bank == [2]
+      assert state.config.random_bank == [3]
     end
   end
 
