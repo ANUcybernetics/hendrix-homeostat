@@ -7,11 +7,16 @@ defmodule HendrixHomeostat.Application do
   def start(_type, _args) do
     validate_config!()
 
-    children = [
-      {HendrixHomeostat.MidiController, []},
-      {HendrixHomeostat.AudioMonitor, []},
-      {HendrixHomeostat.ControlLoop, []}
-    ]
+    children =
+      if Mix.env() == :test do
+        []
+      else
+        [
+          {HendrixHomeostat.MidiController, []},
+          {HendrixHomeostat.AudioMonitor, []},
+          {HendrixHomeostat.ControlLoop, []}
+        ]
+      end
 
     opts = [strategy: :one_for_one, name: HendrixHomeostat.Supervisor]
     Supervisor.start_link(children, opts)

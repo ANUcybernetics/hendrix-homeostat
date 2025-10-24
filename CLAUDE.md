@@ -43,6 +43,38 @@ running on Raspberry Pi 5 to control a guitar feedback loop system.
 - test audio processing logic on `:host` target when possible before burning to
   device
 
+## Testing
+
+This project uses a backend abstraction pattern to enable testing on host
+without hardware.
+
+### Running tests
+
+```bash
+# Run all tests on host (default)
+mix test
+
+# Run specific test file
+mix test test/path/to/test.exs
+
+# Run integration tests only
+mix test test/integration/
+
+# On target hardware with real devices (when needed)
+MIX_TARGET=rpi5 mix test --include target_only
+```
+
+### Test types
+
+- **Pure functions**: AudioAnalysis tests run on both host and target
+- **GenServer unit tests**: Use backend abstractions (InMemory MIDI, File audio)
+- **Integration tests**: Deterministic tests that send messages directly to
+  ControlLoop
+- **Target-only tests**: Tagged with `@tag :target_only`, require real hardware
+
+The test suite automatically excludes `:target_only` tests when running on host.
+See `test/test_helper.exs` for configuration details.
+
 ## Task management
 
 - use the backlog CLI tool via the project-manager-backlog agent for task
