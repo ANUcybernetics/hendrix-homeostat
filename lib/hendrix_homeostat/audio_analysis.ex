@@ -71,6 +71,7 @@ defmodule HendrixHomeostat.AudioAnalysis do
   end
 
   defp compute_rms([]), do: 0.0
+
   defp compute_rms(samples) do
     sum_of_squares =
       samples
@@ -85,6 +86,7 @@ defmodule HendrixHomeostat.AudioAnalysis do
 
   defp compute_zcr([]), do: 0.0
   defp compute_zcr([_]), do: 0.0
+
   defp compute_zcr(samples) do
     crossings =
       samples
@@ -95,6 +97,7 @@ defmodule HendrixHomeostat.AudioAnalysis do
   end
 
   defp compute_peak([]), do: 0.0
+
   defp compute_peak(samples) do
     peak =
       samples

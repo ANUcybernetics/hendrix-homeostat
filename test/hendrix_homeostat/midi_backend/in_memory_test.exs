@@ -57,8 +57,11 @@ defmodule HendrixHomeostat.MidiBackend.InMemoryTest do
       history = InMemory.get_history()
       assert length(history) == 3
 
-      assert [{:program_change, _, 1, _}, {:control_change, _, 7, 64, _},
-              {:program_change, _, 2, _}] = history
+      assert [
+               {:program_change, _, 1, _},
+               {:control_change, _, 7, 64, _},
+               {:program_change, _, 2, _}
+             ] = history
     end
   end
 

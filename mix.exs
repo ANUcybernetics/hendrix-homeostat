@@ -45,7 +45,11 @@ defmodule HendrixHomeostat.MixProject do
       {:nerves_pack, "~> 0.7.1", targets: @all_targets},
 
       # Dependencies for specific targets
-      {:nerves_system_rpi5_audio, "~> 0.6", runtime: false, targets: :rpi5, github: "ANUcybernetics/nerves_system_rpi5_audio", nerves: [compile: true]}
+      {:nerves_system_rpi5_audio, "~> 0.6",
+       runtime: false,
+       targets: :rpi5,
+       github: "ANUcybernetics/nerves_system_rpi5_audio",
+       nerves: [compile: true]}
     ]
   end
 

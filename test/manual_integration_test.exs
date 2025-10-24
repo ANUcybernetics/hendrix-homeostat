@@ -32,7 +32,11 @@ defmodule ManualIntegrationTest do
 
     IO.puts("\n=== All Manual Integration Tests Passed ===\n")
     IO.puts("Note: This verifies the integration design and structure.")
-    IO.puts("Full end-to-end tests require running 'mix test test/integration/system_integration_test.exs'")
+
+    IO.puts(
+      "Full end-to-end tests require running 'mix test test/integration/system_integration_test.exs'"
+    )
+
     IO.puts("after installing libmnl-dev: sudo apt-get install libmnl-dev")
   end
 

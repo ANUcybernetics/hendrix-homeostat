@@ -53,7 +53,8 @@ defmodule HendrixHomeostat.AudioAnalysisTest do
       int_samples = [100, 200, 300]
       float_samples = [100.0, 200.0, 300.0]
 
-      assert AudioAnalysis.calculate_rms(int_samples) == AudioAnalysis.calculate_rms(float_samples)
+      assert AudioAnalysis.calculate_rms(int_samples) ==
+               AudioAnalysis.calculate_rms(float_samples)
     end
 
     test "handles empty list" do

@@ -303,6 +303,7 @@ defmodule HendrixHomeostat.ControlLoopTest do
       Process.sleep(100)
 
       state = :sys.get_state(ControlLoop)
+
       :sys.replace_state(ControlLoop, fn s ->
         %{s | last_action_timestamp: System.monotonic_time(:millisecond) - 31_000}
       end)
@@ -361,9 +362,10 @@ defmodule HendrixHomeostat.ControlLoopTest do
     test "does not trigger if variance is above threshold" do
       InMemory.clear_history()
 
-      values = [0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5] ++
-               [0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5] ++
-               [0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5]
+      values =
+        [0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5] ++
+          [0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5] ++
+          [0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5, 0.2, 0.5]
 
       for rms <- values do
         metrics = %{rms: rms, zcr: 0.5, peak: 0.6}
@@ -457,8 +459,12 @@ defmodule HendrixHomeostat.ControlLoopTest do
       assert state.config.comfort_zone_min == Keyword.fetch!(control_config, :comfort_zone_min)
       assert state.config.comfort_zone_max == Keyword.fetch!(control_config, :comfort_zone_max)
       assert state.config.critical_low == Keyword.fetch!(control_config, :critical_low)
-      assert state.config.stability_threshold == Keyword.fetch!(control_config, :stability_threshold)
-      assert state.config.stability_duration == Keyword.fetch!(control_config, :stability_duration)
+
+      assert state.config.stability_threshold ==
+               Keyword.fetch!(control_config, :stability_threshold)
+
+      assert state.config.stability_duration ==
+               Keyword.fetch!(control_config, :stability_duration)
     end
 
     test "reads patch banks from application config" do

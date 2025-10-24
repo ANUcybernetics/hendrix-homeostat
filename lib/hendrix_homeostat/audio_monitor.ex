@@ -4,7 +4,15 @@ defmodule HendrixHomeostat.AudioMonitor do
 
   alias HendrixHomeostat.AudioAnalysis
 
-  defstruct [:backend, :backend_pid, :control_loop_pid, :update_interval, :timer_ref, :last_metrics, :config]
+  defstruct [
+    :backend,
+    :backend_pid,
+    :control_loop_pid,
+    :update_interval,
+    :timer_ref,
+    :last_metrics,
+    :config
+  ]
 
   def child_spec(opts) do
     %{
