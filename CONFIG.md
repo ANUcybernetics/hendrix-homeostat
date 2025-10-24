@@ -53,15 +53,19 @@ Threshold values for the homeostat's decision-making logic. All thresholds are n
 
 **Validation**: The configuration system ensures: critical_low < comfort_zone_min < comfort_zone_max < critical_high
 
-### Patch banks
+### RC-600 CC mapping
 
-Lists of RC-600 memory numbers for different control strategies. Memory numbers range from 0-99.
+MIDI Control Change numbers for controlling RC-600 loop station tracks. These map to ASSIGN settings configured on the RC-600 hardware.
 
-- **boost_bank** (list of integers, default: [1, 2, 3, 4, 5]): Patches to apply when RMS is too low. Should contain settings that amplify or brighten the signal.
+See `RC600_SETUP.md` for complete configuration instructions.
 
-- **dampen_bank** (list of integers, default: [10, 11, 12, 13, 14]): Patches to apply when RMS is too high. Should contain settings that reduce gain or add compression.
+- **track1_rec_play** through **track6_rec_play** (integers, CC#1-6): Control Change numbers to trigger recording/playback/overdub on each track.
 
-- **random_bank** (list of integers, default: [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]): Patches for anti-stasis perturbation. Should be varied to prevent system from settling into overly stable states.
+- **track1_stop** through **track6_stop** (integers, CC#11-16): Control Change numbers to stop each track.
+
+- **track1_clear** through **track4_clear** (integers, CC#21-24): Control Change numbers to clear/erase each track.
+
+All CC numbers must be in the valid range supported by RC-600 ASSIGN: 1-31 or 64-95.
 
 ### Backend selection
 
@@ -83,7 +87,7 @@ Configuration is validated at application startup in `HendrixHomeostat.Applicati
 2. Values have correct types (integers, floats, strings, atoms)
 3. Numeric values are within valid ranges
 4. Threshold relationships are logically consistent
-5. Patch bank memory numbers are valid (0-99)
+5. RC-600 CC numbers are in valid range (1-31 or 64-95)
 6. MIDI channel is in valid range (1-16)
 
 If validation fails, the application will not start and will raise an error describing the problem.

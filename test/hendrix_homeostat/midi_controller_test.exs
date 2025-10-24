@@ -344,5 +344,105 @@ defmodule HendrixHomeostat.MidiControllerTest do
       state = :sys.get_state(MidiController)
       assert state.channel == channel
     end
+
+    test "reads rc600_cc_map from application config" do
+      cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
+
+      assert Keyword.get(cc_map, :track1_rec_play) == 1
+      assert Keyword.get(cc_map, :track1_stop) == 11
+      assert Keyword.get(cc_map, :track1_clear) == 21
+    end
+  end
+
+  describe "RC-600 track control" do
+    test "start_recording/1 sends correct CC for track 1" do
+      MidiController.start_recording(1)
+      Process.sleep(10)
+
+      history = InMemory.get_history()
+      [{:control_change, _device, cc, value, _timestamp}] = history
+      assert cc == 1
+      assert value == 127
+    end
+
+    test "start_recording/1 sends correct CC for track 6" do
+      MidiController.start_recording(6)
+      Process.sleep(10)
+
+      history = InMemory.get_history()
+      [{:control_change, _device, cc, value, _timestamp}] = history
+      assert cc == 6
+      assert value == 127
+    end
+
+    test "stop_track/1 sends correct CC for track 1" do
+      MidiController.stop_track(1)
+      Process.sleep(10)
+
+      history = InMemory.get_history()
+      [{:control_change, _device, cc, value, _timestamp}] = history
+      assert cc == 11
+      assert value == 127
+    end
+
+    test "stop_track/1 sends correct CC for track 6" do
+      MidiController.stop_track(6)
+      Process.sleep(10)
+
+      history = InMemory.get_history()
+      [{:control_change, _device, cc, value, _timestamp}] = history
+      assert cc == 16
+      assert value == 127
+    end
+
+    test "clear_track/1 sends correct CC for track 1" do
+      MidiController.clear_track(1)
+      Process.sleep(10)
+
+      history = InMemory.get_history()
+      [{:control_change, _device, cc, value, _timestamp}] = history
+      assert cc == 21
+      assert value == 127
+    end
+
+    test "clear_track/1 sends correct CC for track 4" do
+      MidiController.clear_track(4)
+      Process.sleep(10)
+
+      history = InMemory.get_history()
+      [{:control_change, _device, cc, value, _timestamp}] = history
+      assert cc == 24
+      assert value == 127
+    end
+
+    test "start_recording/1 rejects invalid track numbers" do
+      assert_raise FunctionClauseError, fn ->
+        MidiController.start_recording(0)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        MidiController.start_recording(7)
+      end
+    end
+
+    test "stop_track/1 rejects invalid track numbers" do
+      assert_raise FunctionClauseError, fn ->
+        MidiController.stop_track(0)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        MidiController.stop_track(7)
+      end
+    end
+
+    test "clear_track/1 rejects invalid track numbers" do
+      assert_raise FunctionClauseError, fn ->
+        MidiController.clear_track(0)
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        MidiController.clear_track(5)
+      end
+    end
   end
 end

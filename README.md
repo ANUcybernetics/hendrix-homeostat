@@ -11,23 +11,23 @@ Pi control system to create a self-regulating feedback loop.
 The guitar's pickup(s) captures resonating body vibrations caused by loudspeaker
 output, routes the signal through an effects pedal, and back to the
 loudspeaker---creating a feedback loop. The Raspberry Pi monitors the audio
-signal and triggers patch changes to maintain dynamic equilibrium.
+signal and controls the RC-600 loop station tracks to maintain dynamic equilibrium.
 
 ## Conceptual mapping to Ashby's homeostat
 
 | Homeostat             | Audio system                                               |
 | --------------------- | ---------------------------------------------------------- |
 | Needle position       | Audio signal level/characteristics                         |
-| Uniselector switching | Effects patch changes                                      |
+| Uniselector switching | Track recording/stopping/clearing                          |
 | Stability seeking     | Maintaining target sonic characteristics                   |
-| Ultrastability        | Finding patches that keep system "alive" but not blown out |
+| Ultrastability        | Finding track configurations that keep system "alive" but not blown out |
 
 ## Control algorithm
 
 ### Core principles
 
 1. **Primary adaptation**: continuous monitoring of audio metrics
-2. **Secondary adaptation**: discrete patch changes when hitting limits
+2. **Secondary adaptation**: discrete track control actions when hitting limits
 3. **Anti-stasis**: deliberate perturbation when system becomes too stable
 
 ### Key metrics to monitor
@@ -40,24 +40,26 @@ signal and triggers patch changes to maintain dynamic equilibrium.
 
 ```
 Critical high (>0.8) ──┐
-                       ├── Trigger patch change
+                       ├── Stop playing tracks
 Comfort zone (0.2-0.5) ──── Stable operation
-                       ├── Trigger patch change
+                       ├── Start recording on tracks
 Critical low (<0.05) ──┘
 ```
 
-### Patch switching strategies
+### Track control strategies
 
-1. **Out of bounds**: random patch selection when levels hit critical limits
-2. **Too quiet**: select from "boost" patch bank
-3. **Too loud**: select from "dampen" patch bank
-4. **Too stable**: random perturbation after extended stability
+1. **Too quiet**: start recording on empty tracks to build up material
+2. **Too loud**: stop playing tracks to reduce feedback
+3. **Too stable**: clear random tracks to force system rebuild and perturbation
+
+The RC-600 loop station provides 6 independent tracks, allowing the homeostat to
+layer and remove loops dynamically via MIDI CC messages.
 
 ## Audio behaviour goals
 
 1. **Dynamic equilibrium**: system seeks balance but never stasis
-2. **Sonic variety**: patches change based on both necessity and boredom
-3. **Self-organisation**: system finds its own stable configurations
+2. **Sonic variety**: track configurations change based on both necessity and boredom
+3. **Self-organisation**: system finds its own stable loop configurations
 4. **Resilience**: recovers from both silence and overload
 
 ## Hardware
@@ -65,8 +67,8 @@ Critical low (<0.05) ──┘
 - Boss Katana Gen3 100w combo amp
 - Boss RC-600 loop station pedal
 - hollowbody electric-acoustic guitar (e.g. Gretsch, Gibson ES series)
-- Raspberry Pi 5 with audio in (from guitar pickup) and MIDI out (to trigger
-  RC-600 patch changes)
+- Raspberry Pi 5 with audio in (from guitar pickup) and MIDI out (to control
+  RC-600 track recording/playback)
 - Presonus Revelator io24 (USB audio/MIDI interface)
 
 ## Hardware setup notes

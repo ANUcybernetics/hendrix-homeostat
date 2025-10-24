@@ -8,9 +8,10 @@ defmodule HendrixHomeostat.Application do
     validate_config!()
 
     children = [
-      {HendrixHomeostat.MidiController, []},
-      {HendrixHomeostat.AudioMonitor, []},
-      {HendrixHomeostat.ControlLoop, []}
+      {HendrixHomeostat.MidiController, []}
+      # TODO: Update ControlLoop to use RC-600 CC control instead of patch banks
+      # {HendrixHomeostat.AudioMonitor, []},
+      # {HendrixHomeostat.ControlLoop, []}
     ]
 
     opts = [strategy: :one_for_one, name: HendrixHomeostat.Supervisor]
@@ -21,7 +22,7 @@ defmodule HendrixHomeostat.Application do
     validate_audio_config!()
     validate_midi_config!()
     validate_control_config!()
-    validate_patch_banks_config!()
+    validate_rc600_cc_map_config!()
     validate_backends_config!()
   end
 
@@ -116,33 +117,34 @@ defmodule HendrixHomeostat.Application do
     end
   end
 
-  defp validate_patch_banks_config! do
-    patch_banks = Application.fetch_env!(:hendrix_homeostat, :patch_banks)
+  defp validate_rc600_cc_map_config! do
+    cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
 
-    unless Keyword.keyword?(patch_banks) do
-      raise "patch_banks configuration must be a keyword list"
+    unless Keyword.keyword?(cc_map) do
+      raise "rc600_cc_map configuration must be a keyword list"
     end
 
-    boost_bank = Keyword.fetch!(patch_banks, :boost_bank)
-    dampen_bank = Keyword.fetch!(patch_banks, :dampen_bank)
-    random_bank = Keyword.fetch!(patch_banks, :random_bank)
+    for track <- 1..6 do
+      rec_play_key = String.to_atom("track#{track}_rec_play")
+      stop_key = String.to_atom("track#{track}_stop")
 
-    validate_patch_bank!(:boost_bank, boost_bank)
-    validate_patch_bank!(:dampen_bank, dampen_bank)
-    validate_patch_bank!(:random_bank, random_bank)
+      rec_play_cc = Keyword.fetch!(cc_map, rec_play_key)
+      stop_cc = Keyword.fetch!(cc_map, stop_key)
+
+      validate_cc_number!(rec_play_key, rec_play_cc)
+      validate_cc_number!(stop_key, stop_cc)
+    end
+
+    for track <- 1..4 do
+      clear_key = String.to_atom("track#{track}_clear")
+      clear_cc = Keyword.fetch!(cc_map, clear_key)
+      validate_cc_number!(clear_key, clear_cc)
+    end
   end
 
-  defp validate_patch_bank!(name, bank) do
-    unless is_list(bank) and length(bank) > 0 do
-      raise "patch_banks.#{name} must be a non-empty list"
-    end
-
-    unless Enum.all?(bank, &is_integer/1) do
-      raise "patch_banks.#{name} must contain only integers"
-    end
-
-    unless Enum.all?(bank, &(&1 >= 0 and &1 <= 99)) do
-      raise "patch_banks.#{name} must contain memory numbers between 0 and 99"
+  defp validate_cc_number!(name, value) do
+    unless is_integer(value) and ((value >= 1 and value <= 31) or (value >= 64 and value <= 95)) do
+      raise "rc600_cc_map.#{name} must be an integer in range 1-31 or 64-95"
     end
   end
 

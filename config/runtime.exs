@@ -40,10 +40,23 @@ if target == :host do
       stability_threshold: 0.02,
       stability_duration: 30_000
     ],
-    patch_banks: [
-      boost_bank: [1, 2, 3, 4, 5],
-      dampen_bank: [10, 11, 12, 13, 14],
-      random_bank: [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    rc600_cc_map: [
+      track1_rec_play: 1,
+      track2_rec_play: 2,
+      track3_rec_play: 3,
+      track4_rec_play: 4,
+      track5_rec_play: 5,
+      track6_rec_play: 6,
+      track1_stop: 11,
+      track2_stop: 12,
+      track3_stop: 13,
+      track4_stop: 14,
+      track5_stop: 15,
+      track6_stop: 16,
+      track1_clear: 21,
+      track2_clear: 22,
+      track3_clear: 23,
+      track4_clear: 24
     ],
     backends: [
       midi_backend: HendrixHomeostat.MidiBackend.InMemory,
@@ -73,10 +86,23 @@ else
       stability_threshold: 0.02,
       stability_duration: 30_000
     ],
-    patch_banks: [
-      boost_bank: [1, 2, 3, 4, 5],
-      dampen_bank: [10, 11, 12, 13, 14],
-      random_bank: [20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
+    rc600_cc_map: [
+      track1_rec_play: 1,
+      track2_rec_play: 2,
+      track3_rec_play: 3,
+      track4_rec_play: 4,
+      track5_rec_play: 5,
+      track6_rec_play: 6,
+      track1_stop: 11,
+      track2_stop: 12,
+      track3_stop: 13,
+      track4_stop: 14,
+      track5_stop: 15,
+      track6_stop: 16,
+      track1_clear: 21,
+      track2_clear: 22,
+      track3_clear: 23,
+      track4_clear: 24
     ],
     backends: [
       midi_backend: HendrixHomeostat.MidiBackend.Amidi,

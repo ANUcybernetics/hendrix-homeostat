@@ -23,6 +23,29 @@ defmodule HendrixHomeostat.MidiController do
     GenServer.cast(__MODULE__, {:send_control_change, cc_number, value})
   end
 
+  def start_recording(track_number) when track_number >= 1 and track_number <= 6 do
+    cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
+    cc = get_track_cc(cc_map, track_number, :rec_play)
+    send_control_change(cc, 127)
+  end
+
+  def stop_track(track_number) when track_number >= 1 and track_number <= 6 do
+    cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
+    cc = get_track_cc(cc_map, track_number, :stop)
+    send_control_change(cc, 127)
+  end
+
+  def clear_track(track_number) when track_number >= 1 and track_number <= 4 do
+    cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
+    cc = get_track_cc(cc_map, track_number, :clear)
+    send_control_change(cc, 127)
+  end
+
+  defp get_track_cc(cc_map, track_number, action) do
+    key = String.to_atom("track#{track_number}_#{action}")
+    Keyword.fetch!(cc_map, key)
+  end
+
   @impl true
   def init(_opts) do
     backends = Application.fetch_env!(:hendrix_homeostat, :backends)

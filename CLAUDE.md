@@ -8,7 +8,7 @@ running on Raspberry Pi 5 to control a guitar feedback loop system.
 - **Target platform**: Raspberry Pi 5 (Nerves embedded system)
 - **Audio interface**: Presonus Revelator io24 (USB audio/MIDI)
 - **Control output**: MIDI commands to Boss RC-600 loop station
-- **Audio flow**: guitar pickup → audio analysis → MIDI patch changes → effects
+- **Audio flow**: guitar pickup → audio analysis → MIDI track control → effects
   loop
 
 ## Key implementation points
@@ -30,10 +30,9 @@ running on Raspberry Pi 5 to control a guitar feedback loop system.
 ### Control philosophy
 
 - system should find its own equilibrium, not be micromanaged
-- patch changes are discrete events triggered by threshold violations
+- track control actions are discrete events triggered by threshold violations
 - anti-stasis mechanism prevents system from becoming too stable
-- three patch banks: boost (for quiet states), dampen (for loud states), random
-  (for perturbation)
+- three control strategies: start recording (for quiet states), stop tracks (for loud states), clear tracks (for perturbation)
 
 ## Development workflow
 
