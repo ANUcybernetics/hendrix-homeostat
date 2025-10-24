@@ -1,11 +1,24 @@
 import Config
 
-target = System.get_env("MIX_TARGET", "host")
+# At runtime, MIX_TARGET isn't set. We need to detect if we're on real hardware.
+# On Nerves devices, Mix.target/0 returns the actual target.
+# During development/test on host, it returns :host.
+target =
+  if Code.ensure_loaded?(Mix) and function_exported?(Mix, :target, 0) do
+    Mix.target()
+  else
+    # Fallback: check if we're in a Nerves runtime environment
+    if Code.ensure_loaded?(Nerves.Runtime) do
+      :rpi5
+    else
+      :host
+    end
+  end
 
 config :hendrix_homeostat,
-  target: String.to_atom(target)
+  target: target
 
-if target == "host" do
+if target == :host do
   config :hendrix_homeostat,
     midi_enabled: false,
     audio_enabled: false,
@@ -44,7 +57,9 @@ else
       sample_rate: 48000,
       buffer_size: 4800,
       device_name: "hw:0,0",
-      update_rate: 10
+      update_rate: 10,
+      format: "S32_LE",
+      channels: 6
     ],
     midi: [
       device_name: "/dev/snd/midiC0D0",

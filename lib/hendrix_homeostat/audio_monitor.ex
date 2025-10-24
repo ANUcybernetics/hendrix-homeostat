@@ -11,7 +11,8 @@ defmodule HendrixHomeostat.AudioMonitor do
     :update_interval,
     :timer_ref,
     :last_metrics,
-    :config
+    :config,
+    :format
   ]
 
   def child_spec(opts) do
@@ -34,6 +35,7 @@ defmodule HendrixHomeostat.AudioMonitor do
     backend_module = Keyword.fetch!(backends, :audio_backend)
     update_rate = Keyword.fetch!(audio_config, :update_rate)
     buffer_size = Keyword.fetch!(audio_config, :buffer_size)
+    format = Keyword.get(audio_config, :format, "S16_LE")
 
     backend_config = build_backend_config(audio_config)
 
@@ -49,6 +51,7 @@ defmodule HendrixHomeostat.AudioMonitor do
           update_interval: update_interval,
           timer_ref: timer_ref,
           last_metrics: nil,
+          format: format_to_atom(format),
           config: %{
             buffer_size: buffer_size,
             sample_rate: Keyword.fetch!(audio_config, :sample_rate),
@@ -68,7 +71,7 @@ defmodule HendrixHomeostat.AudioMonitor do
   def handle_info(:read_audio, state) do
     case state.backend.read_buffer(state.backend_pid) do
       {:ok, buffer} ->
-        metrics = AudioAnalysis.calculate_metrics(buffer)
+        metrics = AudioAnalysis.calculate_metrics(buffer, format: state.format)
         send(state.control_loop_pid, {:metrics, metrics})
 
         {:noreply, %{state | last_metrics: metrics}}
@@ -92,12 +95,21 @@ defmodule HendrixHomeostat.AudioMonitor do
     device_name = Keyword.fetch!(audio_config, :device_name)
     buffer_size = Keyword.fetch!(audio_config, :buffer_size)
     sample_rate = Keyword.fetch!(audio_config, :sample_rate)
+    format = Keyword.get(audio_config, :format, "S16_LE")
+    channels = Keyword.get(audio_config, :channels, 1)
 
     %{
       file_path: device_name,
       device_name: device_name,
       buffer_size: buffer_size,
-      sample_rate: sample_rate
+      sample_rate: sample_rate,
+      format: format,
+      channels: channels
     }
   end
+
+  defp format_to_atom("S16_LE"), do: :s16
+  defp format_to_atom("S32_LE"), do: :s32
+  defp format_to_atom(:s16), do: :s16
+  defp format_to_atom(:s32), do: :s32
 end
