@@ -43,6 +43,26 @@ running on Raspberry Pi 5 to control a guitar feedback loop system.
 - test audio processing logic on `:host` target when possible before burning to
   device
 
+### Remote access to target device
+
+Use the ht-mcp server for interactive SSH sessions to the target device:
+
+```elixir
+# Create an SSH session (opens live terminal preview in browser)
+mcp__ht-mcp__ht_create_session(command: ["ssh", "nerves.local"], enableWebServer: true)
+
+# Take a snapshot to see current terminal state
+mcp__ht-mcp__ht_take_snapshot(sessionId: "session-id")
+
+# Send commands to the terminal
+mcp__ht-mcp__ht_send_keys(sessionId: "session-id", keys: ["cmd(\"arecord -l\")", "Enter"])
+
+# Execute commands directly and get output
+mcp__ht-mcp__ht_execute_command(sessionId: "session-id", command: "ls /dev/snd")
+```
+
+The live terminal preview URL is provided when creating the session.
+
 ## Testing
 
 This project uses a backend abstraction pattern to enable testing on host
