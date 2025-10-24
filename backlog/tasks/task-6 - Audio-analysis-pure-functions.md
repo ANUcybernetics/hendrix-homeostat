@@ -1,9 +1,10 @@
 ---
 id: task-6
 title: Audio analysis pure functions
-status: Completed
+status: Done
 assignee: []
 created_date: '2025-10-10 10:32'
+completed_date: '2025-10-11'
 labels:
   - elixir
   - audio

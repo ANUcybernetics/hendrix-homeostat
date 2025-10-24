@@ -1,9 +1,10 @@
 ---
 id: task-12
 title: AudioMonitor integration tests with recorded audio
-status: To Do
+status: Done
 assignee: []
 created_date: '2025-10-10 10:33'
+completed_date: '2025-10-11'
 labels:
   - elixir
   - audio
@@ -22,12 +23,12 @@ Write integration tests for AudioMonitor using pre-recorded audio files. Test wi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Test suite created at test/audio_monitor_integration_test.exs
-- [ ] #2 Test audio files created or sourced (silence.wav, sustained_note.wav, dynamic_playing.wav)
-- [ ] #3 Tests verify AudioMonitor starts and initializes Port correctly
-- [ ] #4 Tests verify metric extraction from audio buffers with known content
-- [ ] #5 Tests verify Port restart on crash
-- [ ] #6 Tests verify configuration loading for device and parameters
-- [ ] #7 Tests verify get_metrics/0 returns current values
-- [ ] #8 All tests pass with 'mix test'
+- [x] #1 Test suite created at test/audio_monitor_integration_test.exs
+- [x] #2 Test audio files created or sourced (silence.wav, sustained_note.wav, dynamic_playing.wav)
+- [x] #3 Tests verify AudioMonitor starts and initializes Port correctly
+- [x] #4 Tests verify metric extraction from audio buffers with known content
+- [x] #5 Tests verify Port restart on crash
+- [x] #6 Tests verify configuration loading for device and parameters
+- [x] #7 Tests verify get_metrics/0 returns current values
+- [x] #8 All tests pass with 'mix test'
 <!-- AC:END -->
