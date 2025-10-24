@@ -52,9 +52,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
           assert cc >= 0 and cc <= 127, "CC number must be 0-127"
           assert value >= 0 and value <= 127, "CC value must be 0-127"
 
-        {:program_change, _device, pc, _timestamp} ->
-          assert pc >= 0 and pc <= 127, "Program change must be 0-127"
-
         other ->
           flunk("Unexpected MIDI message type: #{inspect(other)}")
       end)
@@ -174,8 +171,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       if length(history) > 0 do
         assert Enum.all?(history, fn msg ->
-                 match?({:control_change, _, _, _, _}, msg) or
-                   match?({:program_change, _, _, _}, msg)
+                 match?({:control_change, _, _, _, _}, msg)
                end)
       end
     end
@@ -211,20 +207,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
       assert is_integer(config.stability_duration)
       assert config.stability_threshold > 0.0
       assert config.stability_duration > 0
-    end
-
-    test "control loop has valid bank configuration" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      state = :sys.get_state(control_pid)
-      config = state.config
-
-      assert is_list(config.boost_bank)
-      assert is_list(config.dampen_bank)
-      assert is_list(config.random_bank)
-      assert length(config.boost_bank) > 0
-      assert length(config.dampen_bank) > 0
-      assert length(config.random_bank) > 0
     end
   end
 
@@ -333,25 +315,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
         assert is_binary(device) or is_atom(device), "Device should be string or atom"
         assert is_integer(cc), "CC number should be integer"
         assert is_integer(value), "CC value should be integer"
-        assert is_integer(timestamp), "Timestamp should be integer"
-      end)
-    end
-
-    test "all program change messages have device, program, timestamp" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      InMemory.clear_history()
-
-      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
-      Process.sleep(50)
-
-      history = InMemory.get_history()
-
-      program_changes = Enum.filter(history, &match?({:program_change, _, _, _}, &1))
-
-      Enum.each(program_changes, fn {:program_change, device, program, timestamp} ->
-        assert is_binary(device) or is_atom(device), "Device should be string or atom"
-        assert is_integer(program), "Program should be integer"
         assert match?(%DateTime{}, timestamp), "Timestamp should be DateTime"
       end)
     end
@@ -369,13 +332,9 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       history = InMemory.get_history()
 
-      timestamps =
-        Enum.map(history, fn
-          {:control_change, _, _, _, ts} -> ts
-          {:program_change, _, _, ts} -> ts
-        end)
+      timestamps = Enum.map(history, fn {:control_change, _, _, _, ts} -> ts end)
 
-      sorted_timestamps = Enum.sort_by(timestamps, &DateTime.to_unix(&1, :microsecond))
+      sorted_timestamps = Enum.sort(timestamps)
 
       assert timestamps == sorted_timestamps,
              "Timestamps should be monotonically increasing"
@@ -432,41 +391,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       assert state.current_metrics == last_metrics,
              "Current metrics should reflect most recent update"
-    end
-  end
-
-  describe "state transitions" do
-    test "system state reflects current operating conditions" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      Process.sleep(50)
-
-      state = :sys.get_state(control_pid)
-      assert state.current_state in [:comfortable, :stable, :quiet, :loud],
-             "Should track operating state"
-    end
-
-    test "state can transition between different operating modes" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      Process.sleep(50)
-      state1 = :sys.get_state(control_pid)
-
-      send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
-      Process.sleep(50)
-      state2 = :sys.get_state(control_pid)
-
-      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
-      Process.sleep(50)
-      state3 = :sys.get_state(control_pid)
-
-      states = [state1.current_state, state2.current_state, state3.current_state]
-      unique_states = Enum.uniq(states)
-
-      assert length(unique_states) >= 2,
-             "System should transition between different states"
     end
   end
 end

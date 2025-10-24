@@ -37,7 +37,10 @@ defmodule HendrixHomeostat.AudioMonitor do
     buffer_size = Keyword.fetch!(audio_config, :buffer_size)
     format = Keyword.get(audio_config, :format, "S16_LE")
 
-    backend_config = build_backend_config(audio_config)
+    backend_config =
+      audio_config
+      |> Enum.into(%{})
+      |> Map.put(:file_path, Keyword.fetch!(audio_config, :device_name))
 
     case backend_module.start_link(backend_config) do
       {:ok, backend_pid} ->
@@ -96,23 +99,6 @@ defmodule HendrixHomeostat.AudioMonitor do
     end
 
     :ok
-  end
-
-  defp build_backend_config(audio_config) do
-    device_name = Keyword.fetch!(audio_config, :device_name)
-    buffer_size = Keyword.fetch!(audio_config, :buffer_size)
-    sample_rate = Keyword.fetch!(audio_config, :sample_rate)
-    format = Keyword.get(audio_config, :format, "S16_LE")
-    channels = Keyword.get(audio_config, :channels, 1)
-
-    %{
-      file_path: device_name,
-      device_name: device_name,
-      buffer_size: buffer_size,
-      sample_rate: sample_rate,
-      format: format,
-      channels: channels
-    }
   end
 
   defp format_to_atom("S16_LE"), do: :s16
