@@ -6,6 +6,10 @@ import Config
 
 config :logger, backends: [RingLogger]
 
+# Set logger level to :info on target to reduce unnecessary logging
+# This keeps error/warning/info messages but filters out debug logs
+config :logger, level: :info
+
 # Use shoehorn to start the main application. See the shoehorn
 # library documentation for more control in ordering how OTP
 # applications are started and handling failures.

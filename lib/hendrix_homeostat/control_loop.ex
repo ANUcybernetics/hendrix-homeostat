@@ -98,7 +98,7 @@ defmodule HendrixHomeostat.ControlLoop do
 
   defp handle_critical_high(state) do
     patch = Enum.random(state.config.dampen_bank)
-    Logger.info("Critical high detected, selecting dampen patch #{patch}")
+    Logger.debug("Critical high detected, selecting dampen patch #{patch}")
     HendrixHomeostat.MidiController.send_program_change(patch)
 
     %{
@@ -111,7 +111,7 @@ defmodule HendrixHomeostat.ControlLoop do
 
   defp handle_critical_low(state) do
     patch = Enum.random(state.config.boost_bank)
-    Logger.info("Critical low detected, selecting boost patch #{patch}")
+    Logger.debug("Critical low detected, selecting boost patch #{patch}")
     HendrixHomeostat.MidiController.send_program_change(patch)
 
     %{
@@ -125,7 +125,7 @@ defmodule HendrixHomeostat.ControlLoop do
   defp handle_comfort_zone(state) do
     if stable_too_long?(state) do
       patch = Enum.random(state.config.random_bank)
-      Logger.info("System stable too long, perturbing with random patch #{patch}")
+      Logger.debug("System stable too long, perturbing with random patch #{patch}")
       HendrixHomeostat.MidiController.send_program_change(patch)
 
       %{
