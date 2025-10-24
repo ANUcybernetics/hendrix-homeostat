@@ -12,7 +12,7 @@ if target == "host" do
     audio: [
       sample_rate: 48000,
       buffer_size: 4800,
-      device_name: "test.wav",
+      device_name: "test/fixtures/test.wav",
       update_rate: 10
     ],
     midi: [
