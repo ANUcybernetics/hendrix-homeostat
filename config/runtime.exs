@@ -43,11 +43,11 @@ else
     audio: [
       sample_rate: 48000,
       buffer_size: 4800,
-      device_name: "hw:2,0",
+      device_name: "hw:0,0",
       update_rate: 10
     ],
     midi: [
-      device_name: "/dev/midi1",
+      device_name: "/dev/snd/midiC0D0",
       channel: 1
     ],
     control: [

@@ -45,6 +45,10 @@
 # Detect if we're running on host or target
 target = System.get_env("MIX_TARGET", "host")
 
+# Don't start the application automatically in tests
+# Tests will start supervised processes as needed
+Application.stop(:hendrix_homeostat)
+
 # Configure ExUnit based on target
 exclude_tags =
   if target == "host" do
