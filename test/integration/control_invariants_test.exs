@@ -29,11 +29,9 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
-      # Send metrics that should trigger some response
       send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
       Process.sleep(50)
 
-      # System should have sent SOME MIDI command
       history = InMemory.get_history()
       assert length(history) > 0, "Control loop should respond to extreme metrics"
     end
@@ -43,14 +41,12 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
-      # Trigger various states
       send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
       send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
       Process.sleep(100)
 
       history = InMemory.get_history()
 
-      # All MIDI messages should be valid
       Enum.each(history, fn
         {:control_change, _device, cc, value, _timestamp} ->
           assert cc >= 0 and cc <= 127, "CC number must be 0-127"
@@ -67,13 +63,11 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "control loop maintains state across multiple metric updates" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      # Send several metrics
       send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
       send(control_pid, {:metrics, %{rms: 0.4, zcr: 0.5, peak: 0.4}})
       send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
       Process.sleep(100)
 
-      # Control loop should still be alive and responsive
       state = :sys.get_state(control_pid)
       assert state.current_metrics != nil, "Should have stored latest metrics"
       assert is_list(state.metrics_history), "Should maintain metrics history"
@@ -84,14 +78,12 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
-      # Send comfortable metrics
       send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
       send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
       Process.sleep(50)
 
       history = InMemory.get_history()
 
-      # Should not have sent commands for comfortable metrics
       assert length(history) == 0,
              "Comfort zone metrics should not trigger immediate actions"
     end
@@ -101,7 +93,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
-      # Send very high metrics
       send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
       Process.sleep(50)
 
@@ -115,7 +106,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
-      # Send very low metrics
       send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
       Process.sleep(50)
 
@@ -130,13 +120,11 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
       initial_state = :sys.get_state(control_pid)
       assert initial_state.last_action_timestamp == nil
 
-      # Trigger an action
       send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
       Process.sleep(50)
 
       final_state = :sys.get_state(control_pid)
 
-      # If an action was taken, timestamp should be updated
       history = InMemory.get_history()
 
       if length(history) > 0 do
@@ -151,7 +139,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "control loop maintains bounded metrics history" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      # Send many metrics
       for i <- 1..100 do
         rms = 0.3 + i * 0.001
         send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
@@ -161,7 +148,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       state = :sys.get_state(control_pid)
 
-      # History should be bounded (not grow infinitely)
       assert length(state.metrics_history) <= 30,
              "Metrics history should be bounded to prevent memory growth"
     end
@@ -171,7 +157,6 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "MIDI controller is accessible from control loop" do
       {:ok, _control_pid} = start_supervised(ControlLoop)
 
-      # MidiController should be registered and alive
       midi_pid = Process.whereis(MidiController)
       assert midi_pid != nil, "MidiController should be registered"
       assert Process.alive?(midi_pid), "MidiController should be alive"
@@ -182,13 +167,11 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
-      # Trigger control loop to send MIDI
       send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
       Process.sleep(50)
 
       history = InMemory.get_history()
 
-      # Should have received MIDI commands through the backend
       if length(history) > 0 do
         assert Enum.all?(history, fn msg ->
                  match?({:control_change, _, _, _, _}, msg) or
@@ -205,20 +188,285 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
       state = :sys.get_state(control_pid)
       config = state.config
 
-      # Should have loaded threshold config
       assert is_float(config.critical_high)
       assert is_float(config.critical_low)
       assert is_float(config.comfort_zone_min)
       assert is_float(config.comfort_zone_max)
 
-      # Thresholds should be in valid range
       assert config.critical_high >= 0.0 and config.critical_high <= 1.0
       assert config.critical_low >= 0.0 and config.critical_low <= 1.0
 
-      # Thresholds should be logically ordered
       assert config.critical_low < config.comfort_zone_min
       assert config.comfort_zone_min < config.comfort_zone_max
       assert config.comfort_zone_max < config.critical_high
+    end
+
+    test "control loop loads stability configuration" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      state = :sys.get_state(control_pid)
+      config = state.config
+
+      assert is_float(config.stability_threshold)
+      assert is_integer(config.stability_duration)
+      assert config.stability_threshold > 0.0
+      assert config.stability_duration > 0
+    end
+
+    test "control loop has valid bank configuration" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      state = :sys.get_state(control_pid)
+      config = state.config
+
+      assert is_list(config.boost_bank)
+      assert is_list(config.dampen_bank)
+      assert is_list(config.random_bank)
+      assert length(config.boost_bank) > 0
+      assert length(config.dampen_bank) > 0
+      assert length(config.random_bank) > 0
+    end
+  end
+
+  describe "metric pattern responses" do
+    test "responds differently to sustained high vs brief spike" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      for _ <- 1..5 do
+        send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+        Process.sleep(10)
+      end
+
+      sustained_history = InMemory.get_history()
+      assert length(sustained_history) > 0, "Sustained high should trigger action"
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+
+      spike_history = InMemory.get_history()
+      assert length(spike_history) > 0, "Brief spike should still trigger action"
+    end
+
+    test "handles gradual increase in level" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      for i <- 1..10 do
+        rms = 0.1 + i * 0.08
+        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
+        Process.sleep(10)
+      end
+
+      history = InMemory.get_history()
+
+      assert length(history) > 0, "Gradual increase should eventually trigger action"
+    end
+
+    test "handles alternating high and low levels" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      for i <- 1..10 do
+        rms = if rem(i, 2) == 0, do: 0.9, else: 0.01
+        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
+        Process.sleep(10)
+      end
+
+      history = InMemory.get_history()
+
+      assert length(history) > 0, "Alternating levels should trigger multiple actions"
+    end
+
+    test "stable comfort zone does not trigger actions within short duration" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      for _ <- 1..10 do
+        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+        Process.sleep(10)
+      end
+
+      history = InMemory.get_history()
+
+      assert length(history) == 0,
+             "Stable comfort zone should not trigger actions in short duration"
+    end
+
+    test "metrics history captures recent activity" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      send(control_pid, {:metrics, %{rms: 0.4, zcr: 0.5, peak: 0.4}})
+      send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
+      Process.sleep(50)
+
+      state = :sys.get_state(control_pid)
+
+      assert length(state.metrics_history) >= 3, "Should track recent metrics"
+      assert Enum.all?(state.metrics_history, &is_float/1), "History should contain RMS values"
+    end
+  end
+
+  describe "MIDI message structure validation" do
+    test "all control change messages have device, cc, value, timestamp" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      control_changes = Enum.filter(history, &match?({:control_change, _, _, _, _}, &1))
+
+      Enum.each(control_changes, fn {:control_change, device, cc, value, timestamp} ->
+        assert is_binary(device) or is_atom(device), "Device should be string or atom"
+        assert is_integer(cc), "CC number should be integer"
+        assert is_integer(value), "CC value should be integer"
+        assert is_integer(timestamp), "Timestamp should be integer"
+      end)
+    end
+
+    test "all program change messages have device, program, timestamp" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      program_changes = Enum.filter(history, &match?({:program_change, _, _, _}, &1))
+
+      Enum.each(program_changes, fn {:program_change, device, program, timestamp} ->
+        assert is_binary(device) or is_atom(device), "Device should be string or atom"
+        assert is_integer(program), "Program should be integer"
+        assert match?(%DateTime{}, timestamp), "Timestamp should be DateTime"
+      end)
+    end
+
+    test "MIDI messages have monotonically increasing timestamps" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      for i <- 1..5 do
+        rms = if rem(i, 2) == 0, do: 0.9, else: 0.01
+        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
+        Process.sleep(20)
+      end
+
+      history = InMemory.get_history()
+
+      timestamps =
+        Enum.map(history, fn
+          {:control_change, _, _, _, ts} -> ts
+          {:program_change, _, _, ts} -> ts
+        end)
+
+      sorted_timestamps = Enum.sort_by(timestamps, &DateTime.to_unix(&1, :microsecond))
+
+      assert timestamps == sorted_timestamps,
+             "Timestamps should be monotonically increasing"
+    end
+  end
+
+  describe "history management" do
+    test "history is properly bounded at configured size" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      for i <- 1..50 do
+        rms = 0.3 + rem(i, 5) * 0.01
+        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
+      end
+
+      Process.sleep(100)
+
+      state = :sys.get_state(control_pid)
+
+      assert length(state.metrics_history) <= 30,
+             "History should be bounded to prevent unbounded growth"
+    end
+
+    test "history clears after control action" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      for _ <- 1..5 do
+        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      end
+
+      Process.sleep(50)
+
+      state_before = :sys.get_state(control_pid)
+      history_before = length(state_before.metrics_history)
+
+      send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
+      Process.sleep(50)
+
+      state_after = :sys.get_state(control_pid)
+      history_after = length(state_after.metrics_history)
+
+      assert history_after < history_before,
+             "History should be cleared or reset after action"
+    end
+
+    test "most recent metrics are always accessible" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      last_metrics = %{rms: 0.42, zcr: 0.5, peak: 0.42}
+      send(control_pid, {:metrics, last_metrics})
+      Process.sleep(50)
+
+      state = :sys.get_state(control_pid)
+
+      assert state.current_metrics == last_metrics,
+             "Current metrics should reflect most recent update"
+    end
+  end
+
+  describe "state transitions" do
+    test "system state reflects current operating conditions" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+
+      state = :sys.get_state(control_pid)
+      assert state.current_state in [:comfortable, :stable, :quiet, :loud],
+             "Should track operating state"
+    end
+
+    test "state can transition between different operating modes" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(50)
+      state1 = :sys.get_state(control_pid)
+
+      send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
+      Process.sleep(50)
+      state2 = :sys.get_state(control_pid)
+
+      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
+      Process.sleep(50)
+      state3 = :sys.get_state(control_pid)
+
+      states = [state1.current_state, state2.current_state, state3.current_state]
+      unique_states = Enum.uniq(states)
+
+      assert length(unique_states) >= 2,
+             "System should transition between different states"
     end
   end
 end
