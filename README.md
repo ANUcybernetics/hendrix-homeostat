@@ -8,10 +8,19 @@ Pi control system to create a self-regulating feedback loop.
 
 ## Overview
 
+This is a [Nerves](https://nerves-project.org/) embedded systems project built
+with Elixir, targeting Raspberry Pi 5 hardware. The firmware runs a custom OTP
+application that interfaces with audio hardware to monitor and control a guitar
+feedback loop system.
+
 The guitar's pickup(s) captures resonating body vibrations caused by loudspeaker
 output, routes the signal through an effects pedal, and back to the
 loudspeaker---creating a feedback loop. The Raspberry Pi monitors the audio
 signal and controls the RC-600 loop station tracks to maintain dynamic equilibrium.
+
+**Note**: This project requires a custom Nerves system with ALSA audio support.
+See [nerves_system_rpi5_audio](https://github.com/ANUcybernetics/nerves_system_rpi5_audio)
+for the modified Nerves system that enables audio capture on Raspberry Pi 5.
 
 ## Conceptual mapping to Ashby's homeostat
 
