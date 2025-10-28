@@ -19,3 +19,11 @@ erl_crash.dump
 # Temporary files, for example, from tests.
 /tmp/
 test/fixtures/
+
+# Compiled artifacts
+*.beam
+/_test_compile/
+
+# Build logs
+*.log
+firmware-build.log
