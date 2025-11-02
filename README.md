@@ -104,6 +104,27 @@ circuit parameters until finding a stable configuration. The system performs
 5. **Guitar damping**: partial muting/damping of strings affects feedback
    behaviour
 
+### RC-600 MIDI configuration
+
+The RC-600 must be configured to receive MIDI control from the Raspberry Pi. On the RC-600, configure ASSIGN mappings (Menu → ASSIGN):
+
+**Essential mappings (tracks 1-2 for ultrastable control):**
+- ASSIGN1-2: CC#1-2 → TRK1-2 REC/PLY (TOGGLE mode)
+- ASSIGN7-8: CC#11-12 → TRK1-2 STOP (TOGGLE mode)
+- ASSIGN13-14: CC#21-22 → TRK1-2 CLEAR (TOGGLE mode)
+- ASSIGN15-16: CC#30,32 → TRK1-2 LEVEL (CONTINUOUS mode)
+- ASSIGN17: CC#31 → TRK1 SPEED (CONTINUOUS mode, if available)
+
+**Optional mappings (tracks 3-6 for manual control):**
+- ASSIGN3-6: CC#3-6 → TRK3-6 REC/PLY (TOGGLE mode)
+- ASSIGN9-12: CC#13-16 → TRK3-6 STOP (TOGGLE mode)
+
+**RC-600 MIDI settings:**
+- RX CH CTL: 1 (or match channel in `config/runtime.exs`)
+- CLOCK SYNC: MIDI or AUTO (if syncing to external clock)
+
+The complete MIDI CC mapping is defined in `config/runtime.exs`. If the RC-600 doesn't support per-track SPEED control via ASSIGN, substitute with an alternative parameter (FX level, pan, etc.) for Track 1.
+
 ## Getting started
 
 To start your Nerves app:
