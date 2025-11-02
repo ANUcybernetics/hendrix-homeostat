@@ -1,8 +1,54 @@
 defmodule HendrixHomeostat.ControlLoop do
+  @moduledoc """
+  Ultrastable control loop implementing W. Ross Ashby's homeostat principle.
+
+  This module implements a double feedback loop for adaptive audio control:
+
+  ## First-Order Loop (Homeostasis)
+  Maintains audio level (RMS) within bounds by starting/stopping loop tracks:
+  - RMS ≥ critical_high → Stop random track (damping)
+  - RMS ≤ critical_low → Start recording (excitation, allows overdubbing)
+  - Stable too long → Clear track (anti-stasis)
+
+  ## Second-Order Loop (Ultrastability)
+  When the first-order loop fails to achieve stability (e.g., oscillating between
+  extremes), the system randomly changes track parameters (volume, speed on track 1)
+  to find a configuration that can stabilize. This is analogous to Ashby's uniselector
+  mechanism, which randomly changed circuit parameters until equilibrium was found.
+
+  ## Overdubbing Behavior
+  The system embraces overdubbing as part of its emergent complexity:
+  - Calling start_recording on a playing track will overdub new material
+  - This creates evolving textures and density over time
+  - When a track becomes problematic (repeatedly causing critical_high), it gets cleared
+  - This creates natural sparse → dense → sparse cycles
+
+  ## Why It Works
+  - **Negative feedback**: High levels trigger damping, low levels trigger excitation
+  - **Parameter adaptation**: When current settings don't work, random search finds
+    new settings that do (trial-and-error learning)
+  - **Emergent stability**: System discovers equilibrium rather than being programmed
+    for it
+  - **Requisite variety**: Random parameter selection provides variety to match
+    environmental disturbances
+
+  The system explores a configuration space of ~125 combinations (5 volume levels ×
+  5 speed levels on track 1, 5 volume levels on track 2) until finding parameters
+  that achieve homeostasis.
+  """
+
   use GenServer
   require Logger
 
   @history_size 30
+  @ultrastable_history_size 100
+  @action_history_size 10
+
+  defmodule TrackParams do
+    @moduledoc false
+    # Track 1 has speed control, Track 2 does not
+    defstruct volume: 75, speed: nil
+  end
 
   def child_spec(opts) do
     %{
@@ -26,13 +72,25 @@ defmodule HendrixHomeostat.ControlLoop do
       comfort_zone_max: Keyword.fetch!(control_config, :comfort_zone_max),
       critical_low: Keyword.fetch!(control_config, :critical_low),
       stability_threshold: Keyword.fetch!(control_config, :stability_threshold),
-      stability_duration: Keyword.fetch!(control_config, :stability_duration)
+      stability_duration: Keyword.fetch!(control_config, :stability_duration),
+      ultrastable_oscillation_threshold:
+        Keyword.get(control_config, :ultrastable_oscillation_threshold, 10),
+      ultrastable_min_duration: Keyword.get(control_config, :ultrastable_min_duration, 60_000),
+      stuck_track_threshold: Keyword.get(control_config, :stuck_track_threshold, 5)
     }
 
     state = %{
       current_metrics: nil,
       metrics_history: [],
       last_action_timestamp: nil,
+      # Second-order ultrastability state
+      track1_params: %TrackParams{speed: 112},  # Track 1 has speed
+      track2_params: %TrackParams{},  # Track 2 does not
+      ultrastable_history: [],
+      last_param_change_timestamp: nil,
+      stability_attempts: 0,
+      # Action history for detecting stuck tracks
+      action_history: [],
       config: config
     }
 
@@ -52,64 +110,206 @@ defmodule HendrixHomeostat.ControlLoop do
   defp update_metrics(state, metrics) do
     new_history = [metrics.rms | state.metrics_history] |> Enum.take(@history_size)
 
-    %{state | current_metrics: metrics, metrics_history: new_history}
-  end
-
-  defp evaluate_and_act(state) do
-    rms = state.current_metrics.rms
-
-    cond do
-      rms >= state.config.critical_high ->
-        handle_critical_high(state)
-
-      rms <= state.config.critical_low ->
-        handle_critical_low(state)
-
-      in_comfort_zone?(rms, state.config) ->
-        handle_comfort_zone(state)
-
-      true ->
-        state
-    end
-  end
-
-  defp handle_critical_high(state) do
-    track = Enum.random(1..6)
-    Logger.debug("Critical high detected, stopping track #{track}")
-    HendrixHomeostat.MidiController.stop_track(track)
+    new_ultrastable_history =
+      [metrics | state.ultrastable_history] |> Enum.take(@ultrastable_history_size)
 
     %{
       state
-      | last_action_timestamp: System.monotonic_time(:millisecond),
-        metrics_history: []
+      | current_metrics: metrics,
+        metrics_history: new_history,
+        ultrastable_history: new_ultrastable_history
     }
   end
 
+  defp evaluate_and_act(state) do
+    # Check for second-order failure first (ultrastability)
+    if system_failing_to_stabilize?(state) do
+      handle_ultrastable_reconfiguration(state)
+    else
+      # Normal first-order homeostatic control
+      rms = state.current_metrics.rms
+
+      cond do
+        rms >= state.config.critical_high ->
+          handle_critical_high(state)
+
+        rms <= state.config.critical_low ->
+          handle_critical_low(state)
+
+        in_comfort_zone?(rms, state.config) ->
+          handle_comfort_zone(state)
+
+        true ->
+          state
+      end
+    end
+  end
+
+  # Second-order ultrastable control
+  defp system_failing_to_stabilize?(state) do
+    with true <- length(state.ultrastable_history) >= @ultrastable_history_size,
+         true <- time_since_param_change(state) >= state.config.ultrastable_min_duration,
+         true <- excessive_oscillation?(state.ultrastable_history, state.config) do
+      true
+    else
+      _ -> false
+    end
+  end
+
+  defp time_since_param_change(%{last_param_change_timestamp: nil}), do: :infinity
+
+  defp time_since_param_change(state) do
+    System.monotonic_time(:millisecond) - state.last_param_change_timestamp
+  end
+
+  defp excessive_oscillation?(history, config) do
+    # Count transitions between critical_high and critical_low
+    critical_crossings =
+      history
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.count(fn [a, b] ->
+        (a.rms <= config.critical_low and b.rms >= config.critical_high) or
+          (a.rms >= config.critical_high and b.rms <= config.critical_low)
+      end)
+
+    critical_crossings >= config.ultrastable_oscillation_threshold
+  end
+
+  defp handle_ultrastable_reconfiguration(state) do
+    Logger.info(
+      "Ultrastable reconfiguration triggered (attempt #{state.stability_attempts + 1}) - " <>
+        "system oscillating, changing track parameters"
+    )
+
+    # Randomly mutate parameters - track 1 gets speed, track 2 doesn't
+    new_track1_params = randomize_track_params(1)
+    new_track2_params = randomize_track_params(2)
+
+    # Apply via MIDI
+    apply_track_params(1, new_track1_params)
+    apply_track_params(2, new_track2_params)
+
+    Logger.debug(
+      "New params - Track1: vol=#{new_track1_params.volume} spd=#{new_track1_params.speed}, " <>
+        "Track2: vol=#{new_track2_params.volume}"
+    )
+
+    %{
+      state
+      | track1_params: new_track1_params,
+        track2_params: new_track2_params,
+        stability_attempts: state.stability_attempts + 1,
+        last_param_change_timestamp: System.monotonic_time(:millisecond),
+        ultrastable_history: [],
+        metrics_history: [],
+        action_history: []
+    }
+  end
+
+  defp randomize_track_params(1) do
+    # Track 1 has both volume and speed
+    %TrackParams{
+      volume: Enum.random([25, 50, 75, 100, 127]),
+      speed: Enum.random([64, 80, 96, 112, 127])
+    }
+  end
+
+  defp randomize_track_params(2) do
+    # Track 2 only has volume
+    %TrackParams{
+      volume: Enum.random([25, 50, 75, 100, 127]),
+      speed: nil
+    }
+  end
+
+  defp apply_track_params(track_num, params) do
+    HendrixHomeostat.MidiController.set_track_volume(track_num, params.volume)
+
+    # Only apply speed if it's set (Track 1 only)
+    if params.speed do
+      HendrixHomeostat.MidiController.set_track_speed(track_num, params.speed)
+    end
+  end
+
+  # First-order homeostatic control
+  defp handle_critical_high(state) do
+    track = Enum.random(1..2)
+
+    # Check if this track is repeatedly causing problems
+    if track_is_stuck?(state, track, :stop) do
+      Logger.debug("Track #{track} repeatedly causing critical_high, clearing it instead of stopping")
+      HendrixHomeostat.MidiController.clear_track(track)
+
+      new_action_history = record_action(state.action_history, {:clear, track})
+
+      %{
+        state
+        | last_action_timestamp: System.monotonic_time(:millisecond),
+          metrics_history: [],
+          action_history: new_action_history
+      }
+    else
+      Logger.debug("Critical high detected, stopping track #{track}")
+      HendrixHomeostat.MidiController.stop_track(track)
+
+      new_action_history = record_action(state.action_history, {:stop, track})
+
+      %{
+        state
+        | last_action_timestamp: System.monotonic_time(:millisecond),
+          metrics_history: [],
+          action_history: new_action_history
+      }
+    end
+  end
+
   defp handle_critical_low(state) do
-    track = Enum.random(1..6)
-    Logger.debug("Critical low detected, starting recording on track #{track}")
+    track = Enum.random(1..2)
+    Logger.debug("Critical low detected, starting recording on track #{track} (may overdub if playing)")
     HendrixHomeostat.MidiController.start_recording(track)
+
+    new_action_history = record_action(state.action_history, {:start, track})
 
     %{
       state
       | last_action_timestamp: System.monotonic_time(:millisecond),
-        metrics_history: []
+        metrics_history: [],
+        action_history: new_action_history
     }
   end
 
   defp handle_comfort_zone(state) do
     if stable_too_long?(state) do
-      track = Enum.random(1..4)
+      track = Enum.random(1..2)
       Logger.debug("System stable too long, clearing track #{track}")
       HendrixHomeostat.MidiController.clear_track(track)
+
+      new_action_history = record_action(state.action_history, {:clear, track})
 
       %{
         state
         | last_action_timestamp: System.monotonic_time(:millisecond),
-          metrics_history: []
+          metrics_history: [],
+          action_history: new_action_history
       }
     else
       state
+    end
+  end
+
+  # Action history management
+  defp record_action(history, action) do
+    [action | history] |> Enum.take(@action_history_size)
+  end
+
+  defp track_is_stuck?(state, track, action) do
+    # Check if the last N actions were all the same action on the same track
+    recent_actions = Enum.take(state.action_history, state.config.stuck_track_threshold)
+
+    if length(recent_actions) < state.config.stuck_track_threshold do
+      false
+    else
+      Enum.all?(recent_actions, fn {act, trk} -> act == action and trk == track end)
     end
   end
 

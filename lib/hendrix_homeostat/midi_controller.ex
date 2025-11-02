@@ -41,6 +41,20 @@ defmodule HendrixHomeostat.MidiController do
     send_control_change(cc, 127)
   end
 
+  def set_track_volume(track_number, value)
+      when track_number >= 1 and track_number <= 2 and value >= 0 and value <= 127 do
+    cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
+    cc = get_track_cc(cc_map, track_number, :volume)
+    send_control_change(cc, value)
+  end
+
+  def set_track_speed(track_number, value)
+      when track_number >= 1 and track_number <= 2 and value >= 0 and value <= 127 do
+    cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
+    cc = get_track_cc(cc_map, track_number, :speed)
+    send_control_change(cc, value)
+  end
+
   defp get_track_cc(cc_map, track_number, action) do
     key = String.to_atom("track#{track_number}_#{action}")
     Keyword.fetch!(cc_map, key)

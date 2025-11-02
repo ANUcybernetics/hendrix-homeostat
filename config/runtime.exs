@@ -38,7 +38,10 @@ if target == :host do
       comfort_zone_max: 0.5,
       critical_low: 0.05,
       stability_threshold: 0.02,
-      stability_duration: 30_000
+      stability_duration: 30_000,
+      ultrastable_oscillation_threshold: 10,
+      ultrastable_min_duration: 60_000,
+      stuck_track_threshold: 5
     ],
     rc600_cc_map: [
       track1_rec_play: 1,
@@ -56,7 +59,11 @@ if target == :host do
       track1_clear: 21,
       track2_clear: 22,
       track3_clear: 23,
-      track4_clear: 24
+      track4_clear: 24,
+      track1_volume: 30,
+      track1_speed: 31,
+      track2_volume: 32,
+      track2_speed: 33
     ],
     backends: [
       midi_backend: HendrixHomeostat.MidiBackend.InMemory,
@@ -84,7 +91,9 @@ else
       comfort_zone_max: 0.5,
       critical_low: 0.05,
       stability_threshold: 0.02,
-      stability_duration: 30_000
+      stability_duration: 30_000,
+      ultrastable_oscillation_threshold: 10,
+      ultrastable_min_duration: 60_000
     ],
     rc600_cc_map: [
       track1_rec_play: 1,
@@ -102,7 +111,11 @@ else
       track1_clear: 21,
       track2_clear: 22,
       track3_clear: 23,
-      track4_clear: 24
+      track4_clear: 24,
+      track1_volume: 30,
+      track1_speed: 31,
+      track2_volume: 32,
+      track2_speed: 33
     ],
     backends: [
       midi_backend: HendrixHomeostat.MidiBackend.Amidi,

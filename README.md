@@ -24,45 +24,59 @@ for the modified Nerves system that enables audio capture on Raspberry Pi 5.
 
 ## Conceptual mapping to Ashby's homeostat
 
-| Homeostat             | Audio system                                               |
-| --------------------- | ---------------------------------------------------------- |
-| Needle position       | Audio signal level/characteristics                         |
-| Uniselector switching | Track recording/stopping/clearing                          |
-| Stability seeking     | Maintaining target sonic characteristics                   |
-| Ultrastability        | Finding track configurations that keep system "alive" but not blown out |
+| Ashby's Homeostat          | Audio System                                               |
+| -------------------------- | ---------------------------------------------------------- |
+| Magnetic needle position   | Audio RMS level                                            |
+| Essential variable bounds  | Critical thresholds (0.05 < RMS < 0.8)                     |
+| First-order feedback       | Start/stop/clear tracks to maintain RMS bounds             |
+| Uniselector switching      | Random parameter changes (volume, speed)                   |
+| Second-order adaptation    | Finding parameter configurations that achieve equilibrium  |
+| Ultrastability             | System reconfigures itself when first-order control fails  |
 
-## Control algorithm
+## Control algorithm: Ashby-style ultrastability
 
-### Core principles
+This system implements a **double feedback loop** faithful to Ashby's original design:
 
-1. **Primary adaptation**: continuous monitoring of audio metrics
-2. **Secondary adaptation**: discrete track control actions when hitting limits
-3. **Anti-stasis**: deliberate perturbation when system becomes too stable
+### First-order loop (homeostasis)
 
-### Key metrics to monitor
-
-- **RMS level**: primary measure of signal energy
-- **Spectral centroid**: brightness/tonal balance
-- **Stability**: standard deviation of recent measurements
-
-### Threshold zones
+Maintains RMS audio level within bounds by controlling tracks 1-2:
 
 ```
-Critical high (>0.8) ──┐
-                       ├── Stop playing tracks
-Comfort zone (0.2-0.5) ──── Stable operation
-                       ├── Start recording on tracks
-Critical low (<0.05) ──┘
+Critical high (≥0.8) ──→ Stop random track (damping)
+
+Comfort zone (0.2-0.5) ──→ Stable operation / anti-stasis check
+
+Critical low (≤0.05) ──→ Start recording (excitation)
 ```
 
-### Track control strategies
+**Track actions:**
+- **Too quiet (RMS ≤ 0.05)**: Start recording on track 1 or 2
+- **Too loud (RMS ≥ 0.8)**: Stop track 1 or 2
+- **Too stable (30s, variance <0.02)**: Clear track 1 or 2 (anti-stasis)
 
-1. **Too quiet**: start recording on empty tracks to build up material
-2. **Too loud**: stop playing tracks to reduce feedback
-3. **Too stable**: clear random tracks to force system rebuild and perturbation
+### Second-order loop (ultrastability)
 
-The RC-600 loop station provides 6 independent tracks, allowing the homeostat to
-layer and remove loops dynamically via MIDI CC messages.
+When first-order control fails to stabilize (>10 oscillations between critical
+thresholds over 60 seconds), the system triggers **parameter reconfiguration**:
+
+**Randomly changes track parameters:**
+- Track 1 volume: {25, 50, 75, 100, 127} (5 levels)
+- Track 1 speed: {64, 80, 96, 112, 127} (5 levels) - pitch shifting for sonic variety
+- Track 2 volume: {25, 50, 75, 100, 127} (5 levels)
+- **Configuration space**: 5 × 5 × 5 = 125 combinations
+
+This is analogous to Ashby's uniselector mechanism, which randomly changed
+circuit parameters until finding a stable configuration. The system performs
+**trial-and-error learning** by exploring the parameter space.
+
+### Why it works
+
+- **Negative feedback**: Maintains essential variable (RMS) within bounds
+- **Parameter adaptation**: Searches for configurations that enable stability
+- **Emergent behavior**: System discovers equilibrium rather than following
+  pre-programmed setpoints
+- **Requisite variety**: Random parameter selection provides variety to match
+  environmental disturbances
 
 ## Audio behaviour goals
 

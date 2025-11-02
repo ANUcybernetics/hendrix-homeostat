@@ -26,6 +26,10 @@ defmodule HendrixHomeostat.ControlLoopTest do
       assert state.current_metrics == nil
       assert state.metrics_history == []
       assert state.last_action_timestamp == nil
+      assert state.ultrastable_history == []
+      assert state.last_param_change_timestamp == nil
+      assert state.stability_attempts == 0
+      assert state.action_history == []
 
       stop_supervised(ControlLoop)
     end
