@@ -18,7 +18,7 @@ running on Raspberry Pi 5 to control a guitar feedback loop system.
 - use GenServers for audio monitoring and control logic
 - leverage OTP supervision trees for fault tolerance
 - use Nerves-specific libraries for audio/MIDI interface
-- target is `:rpi5`, development target is `:host`
+- target is `:rpi5`, development target is `:host`, always specify the correct one e.g. `MIX_TARGET="host" mix test`
 
 ### Audio processing
 
