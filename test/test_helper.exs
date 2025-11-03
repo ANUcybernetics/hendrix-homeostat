@@ -42,12 +42,19 @@
 # All tests on target hardware:
 #   MIX_TARGET=rpi5 mix test --include target_only
 
+# Compile test support files
+Code.require_file("support/conn_case.ex", __DIR__)
+
 # Detect if we're running on host or target
 target = System.get_env("MIX_TARGET", "host")
 
 # Don't start the application automatically in tests
 # Tests will start supervised processes as needed
 Application.stop(:hendrix_homeostat)
+
+# Start PubSub for all tests (Phoenix-style)
+# This allows ControlLoop to broadcast state updates even in unit tests
+{:ok, _} = Supervisor.start_link([{Phoenix.PubSub, name: HendrixHomeostat.PubSub}], strategy: :one_for_one)
 
 # Configure ExUnit based on target
 exclude_tags =

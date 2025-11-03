@@ -23,3 +23,48 @@ if Mix.target() == :host do
 else
   import_config "target.exs"
 end
+
+# Import environment specific config. This must remain at the bottom
+# of this file so it overrides the configuration defined above.
+import_config "#{config_env()}.exs"
+
+# Phoenix Configuration
+config :hendrix_homeostat, HendrixHomeostatWeb.Endpoint,
+  url: [host: "localhost"],
+  adapter: Bandit.PhoenixAdapter,
+  render_errors: [
+    formats: [html: HendrixHomeostatWeb.ErrorHTML],
+    layout: false
+  ],
+  pubsub_server: HendrixHomeostat.PubSub,
+  live_view: [signing_salt: "RKAzYHJH"]
+
+# Configures Elixir's Logger
+config :logger, :console,
+  format: "$time $metadata[$level] $message\n",
+  metadata: [:request_id]
+
+# Use Jason for JSON parsing in Phoenix
+config :phoenix, :json_library, Jason
+
+# Configure esbuild (the version is important)
+config :esbuild,
+  version: "0.17.11",
+  hendrix_homeostat: [
+    args:
+      ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
+    cd: Path.expand("../assets", __DIR__),
+    env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
+  ]
+
+# Configure tailwind (the version is important)
+config :tailwind,
+  version: "3.4.3",
+  hendrix_homeostat: [
+    args: ~w(
+      --config=tailwind.config.js
+      --input=css/app.css
+      --output=../priv/static/assets/app.css
+    ),
+    cd: Path.expand("../assets", __DIR__)
+  ]

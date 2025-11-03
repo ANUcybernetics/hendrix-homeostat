@@ -103,8 +103,25 @@ defmodule HendrixHomeostat.ControlLoop do
       state
       |> update_metrics(metrics)
       |> evaluate_and_act()
+      |> broadcast_state()
 
     {:noreply, new_state}
+  end
+
+  defp broadcast_state(state) do
+    # Broadcast state for LiveView updates if PubSub is available
+    # This is defensive - if PubSub isn't started (e.g., in tests), we just skip it
+    try do
+      Phoenix.PubSub.broadcast(
+        HendrixHomeostat.PubSub,
+        "control_loop",
+        {:control_state, state}
+      )
+    rescue
+      ArgumentError -> :ok  # PubSub not available
+    end
+
+    state
   end
 
   defp update_metrics(state, metrics) do

@@ -97,3 +97,37 @@ config :mdns_lite,
 # Uncomment to use target specific configurations
 
 # import_config "#{Mix.target()}.exs"
+
+# Phoenix Endpoint configuration for target (Raspberry Pi)
+config :hendrix_homeostat, HendrixHomeostatWeb.Endpoint,
+  http: [ip: {0, 0, 0, 0}, port: 80],
+  url: [host: "nerves.local", port: 80, scheme: "http"],
+  server: true,
+  code_reloader: false,
+  check_origin: false,
+  secret_key_base: "j3K8m9Lq7nRtWvXyZaBcDeFgHiJkMnOpQrStUvWxYz0A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0U1V2W3X4Y5Z6"
+
+# Add HTTP service to mDNS for web UI
+config :mdns_lite,
+  services: [
+    %{
+      protocol: "ssh",
+      transport: "tcp",
+      port: 22
+    },
+    %{
+      protocol: "sftp-ssh",
+      transport: "tcp",
+      port: 22
+    },
+    %{
+      protocol: "epmd",
+      transport: "tcp",
+      port: 4369
+    },
+    %{
+      protocol: "http",
+      transport: "tcp",
+      port: 80
+    }
+  ]

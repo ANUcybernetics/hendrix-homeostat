@@ -8,6 +8,11 @@ defmodule HendrixHomeostat.Application do
     validate_config!()
 
     children = [
+      # Phoenix components
+      HendrixHomeostatWeb.Telemetry,
+      {Phoenix.PubSub, name: HendrixHomeostat.PubSub},
+      HendrixHomeostatWeb.Endpoint,
+      # Nerves components
       {HendrixHomeostat.MidiController, []},
       {HendrixHomeostat.AudioMonitor, []},
       {HendrixHomeostat.ControlLoop, []}
@@ -15,6 +20,12 @@ defmodule HendrixHomeostat.Application do
 
     opts = [strategy: :one_for_one, name: HendrixHomeostat.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  @impl true
+  def config_change(changed, _new, removed) do
+    HendrixHomeostatWeb.Endpoint.config_change(changed, removed)
+    :ok
   end
 
   defp validate_config! do
