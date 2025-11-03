@@ -20,10 +20,6 @@ defmodule HendrixHomeostatWeb.Endpoint do
     plug Phoenix.LiveReloader
   end
 
-  plug Phoenix.LiveDashboard.RequestLogger,
-    param_key: "request_logger",
-    cookie_key: "request_logger"
-
   plug Plug.Static,
     at: "/",
     from: :hendrix_homeostat,

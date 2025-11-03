@@ -43,7 +43,6 @@ defmodule HendrixHomeostat.MixProject do
       {:phoenix_html, "~> 4.1"},
       {:phoenix_live_reload, "~> 1.5", only: :dev},
       {:phoenix_live_view, "~> 1.0"},
-      {:phoenix_live_dashboard, "~> 0.8"},
       {:bandit, "~> 1.5"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.1"},
