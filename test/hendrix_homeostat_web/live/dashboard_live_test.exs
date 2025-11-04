@@ -38,8 +38,6 @@ defmodule HendrixHomeostatWeb.DashboardLiveTest do
       assert html =~ ">0</dd>"
       # Initial track volumes should be 75
       assert html =~ ">75</dd>"
-      # Initial track 1 speed should be 112
-      assert html =~ ">112</dd>"
     end
 
     test "updates when control state is broadcast", %{conn: conn} do
@@ -52,7 +50,7 @@ defmodule HendrixHomeostatWeb.DashboardLiveTest do
         {:control_state,
          %{
            current_metrics: %{rms: 0.456, zcr: 123.45, peak: 0.789},
-           track1_params: %{volume: 100, speed: 96},
+           track1_params: %{volume: 100},
            track2_params: %{volume: 50},
            stability_attempts: 3
          }}
@@ -64,7 +62,6 @@ defmodule HendrixHomeostatWeb.DashboardLiveTest do
       assert render(view) =~ "0.789"
       assert render(view) =~ ">3</dd>"
       assert render(view) =~ ">100</dd>"
-      assert render(view) =~ ">96</dd>"
       assert render(view) =~ ">50</dd>"
     end
   end

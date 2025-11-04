@@ -52,8 +52,6 @@ if target == :host do
       track2_clear: 6,
       track1_volume: 7,
       track2_volume: 8,
-      track1_speed: 9,
-      track2_speed: 10,
       # Optional manual control tracks (not used by automatic control)
       track3_rec_play: 11,
       track4_rec_play: 12,
@@ -105,8 +103,6 @@ else
       track2_clear: 6,
       track1_volume: 7,
       track2_volume: 8,
-      track1_speed: 9,
-      track2_speed: 10,
       # Optional manual control tracks (not used by automatic control)
       track3_rec_play: 11,
       track4_rec_play: 12,

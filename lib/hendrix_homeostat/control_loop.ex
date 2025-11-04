@@ -12,9 +12,9 @@ defmodule HendrixHomeostat.ControlLoop do
 
   ## Second-Order Loop (Ultrastability)
   When the first-order loop fails to achieve stability (e.g., oscillating between
-  extremes), the system randomly changes track parameters (volume, speed on track 1)
-  to find a configuration that can stabilize. This is analogous to Ashby's uniselector
-  mechanism, which randomly changed circuit parameters until equilibrium was found.
+  extremes), the system randomly changes track volume parameters to find a configuration
+  that can stabilize. This is analogous to Ashby's uniselector mechanism, which randomly
+  changed circuit parameters until equilibrium was found.
 
   ## Overdubbing Behavior
   The system embraces overdubbing as part of its emergent complexity:
@@ -32,9 +32,8 @@ defmodule HendrixHomeostat.ControlLoop do
   - **Requisite variety**: Random parameter selection provides variety to match
     environmental disturbances
 
-  The system explores a configuration space of ~125 combinations (5 volume levels ×
-  5 speed levels on track 1, 5 volume levels on track 2) until finding parameters
-  that achieve homeostasis.
+  The system explores a configuration space of 25 combinations (5 volume levels ×
+  5 volume levels on tracks 1 and 2) until finding parameters that achieve homeostasis.
   """
 
   use GenServer
@@ -46,8 +45,7 @@ defmodule HendrixHomeostat.ControlLoop do
 
   defmodule TrackParams do
     @moduledoc false
-    # Track 1 has speed control, Track 2 does not
-    defstruct volume: 75, speed: nil
+    defstruct volume: 75
   end
 
   def child_spec(opts) do
@@ -84,8 +82,8 @@ defmodule HendrixHomeostat.ControlLoop do
       metrics_history: [],
       last_action_timestamp: nil,
       # Second-order ultrastability state
-      track1_params: %TrackParams{speed: 112},  # Track 1 has speed
-      track2_params: %TrackParams{},  # Track 2 does not
+      track1_params: %TrackParams{},
+      track2_params: %TrackParams{},
       ultrastable_history: [],
       last_param_change_timestamp: nil,
       stability_attempts: 0,
@@ -118,7 +116,8 @@ defmodule HendrixHomeostat.ControlLoop do
         {:control_state, state}
       )
     rescue
-      ArgumentError -> :ok  # PubSub not available
+      # PubSub not available
+      ArgumentError -> :ok
     end
 
     state
@@ -207,8 +206,7 @@ defmodule HendrixHomeostat.ControlLoop do
     apply_track_params(2, new_track2_params)
 
     Logger.debug(
-      "New params - Track1: vol=#{new_track1_params.volume} spd=#{new_track1_params.speed}, " <>
-        "Track2: vol=#{new_track2_params.volume}"
+      "New params - Track1: vol=#{new_track1_params.volume}, Track2: vol=#{new_track2_params.volume}"
     )
 
     %{
@@ -223,29 +221,14 @@ defmodule HendrixHomeostat.ControlLoop do
     }
   end
 
-  defp randomize_track_params(1) do
-    # Track 1 has both volume and speed
+  defp randomize_track_params(_track_num) do
     %TrackParams{
-      volume: Enum.random([25, 50, 75, 100, 127]),
-      speed: Enum.random([64, 80, 96, 112, 127])
-    }
-  end
-
-  defp randomize_track_params(2) do
-    # Track 2 only has volume
-    %TrackParams{
-      volume: Enum.random([25, 50, 75, 100, 127]),
-      speed: nil
+      volume: Enum.random([25, 50, 75, 100, 127])
     }
   end
 
   defp apply_track_params(track_num, params) do
     HendrixHomeostat.MidiController.set_track_volume(track_num, params.volume)
-
-    # Only apply speed if it's set (Track 1 only)
-    if params.speed do
-      HendrixHomeostat.MidiController.set_track_speed(track_num, params.speed)
-    end
   end
 
   # First-order homeostatic control
@@ -254,7 +237,10 @@ defmodule HendrixHomeostat.ControlLoop do
 
     # Check if this track is repeatedly causing problems
     if track_is_stuck?(state, track, :stop) do
-      Logger.debug("Track #{track} repeatedly causing critical_high, clearing it instead of stopping")
+      Logger.debug(
+        "Track #{track} repeatedly causing critical_high, clearing it instead of stopping"
+      )
+
       HendrixHomeostat.MidiController.clear_track(track)
 
       new_action_history = record_action(state.action_history, {:clear, track})
@@ -282,7 +268,11 @@ defmodule HendrixHomeostat.ControlLoop do
 
   defp handle_critical_low(state) do
     track = Enum.random(1..2)
-    Logger.debug("Critical low detected, starting recording on track #{track} (may overdub if playing)")
+
+    Logger.debug(
+      "Critical low detected, starting recording on track #{track} (may overdub if playing)"
+    )
+
     HendrixHomeostat.MidiController.start_recording(track)
 
     new_action_history = record_action(state.action_history, {:start, track})

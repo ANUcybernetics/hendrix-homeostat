@@ -61,9 +61,8 @@ thresholds over 60 seconds), the system triggers **parameter reconfiguration**:
 
 **Randomly changes track parameters:**
 - Track 1 volume: {25, 50, 75, 100, 127} (5 levels)
-- Track 1 speed: {64, 80, 96, 112, 127} (5 levels) - pitch shifting for sonic variety
 - Track 2 volume: {25, 50, 75, 100, 127} (5 levels)
-- **Configuration space**: 5 × 5 × 5 = 125 combinations
+- **Configuration space**: 5 × 5 = 25 combinations
 
 This is analogous to Ashby's uniselector mechanism, which randomly changed
 circuit parameters until finding a stable configuration. The system performs
@@ -126,9 +125,8 @@ The cybernetic control system uses discrete state changes (record fresh, play, s
 - ASSIGN4: SOURCE=CC#4, TARGET=TRK2 STOP, MODE=TOGGLE
 - ASSIGN5: SOURCE=CC#5, TARGET=TRK1 CLEAR, MODE=TOGGLE
 - ASSIGN6: SOURCE=CC#6, TARGET=TRK2 CLEAR, MODE=TOGGLE
-- ASSIGN7: SOURCE=CC#7, TARGET=TRK1 LEVEL, MODE=CONTINUOUS
-- ASSIGN8: SOURCE=CC#8, TARGET=TRK2 LEVEL, MODE=CONTINUOUS
-- ASSIGN9: SOURCE=CC#9, TARGET=TRK1 SPEED, MODE=CONTINUOUS
+- ASSIGN7: SOURCE=CC#7, TARGET=TRK1 LEVEL (continuous parameter, no MODE setting)
+- ASSIGN8: SOURCE=CC#8, TARGET=TRK2 LEVEL (continuous parameter, no MODE setting)
 
 **Optional mappings (tracks 3-6 for manual control):**
 - ASSIGN10-13: SOURCE=CC#11-14, TARGET=TRK3-6 REC/PLAY or REC/DUB, MODE=TOGGLE
@@ -139,7 +137,7 @@ The cybernetic control system uses discrete state changes (record fresh, play, s
 - RX CH CTL: 1 (or match channel in `config/runtime.exs`)
 - CLOCK SYNC: MIDI or AUTO (if syncing to external clock)
 
-The complete MIDI CC mapping is defined in `config/runtime.exs`. If the RC-600 doesn't support per-track SPEED control via ASSIGN, substitute with an alternative parameter (FX level, pan, etc.) for Track 1.
+The complete MIDI CC mapping is defined in `config/runtime.exs`.
 
 ## Getting started
 
