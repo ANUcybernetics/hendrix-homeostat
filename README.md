@@ -106,20 +106,36 @@ circuit parameters until finding a stable configuration. The system performs
 
 ### RC-600 MIDI configuration
 
-The RC-600 must be configured to receive MIDI control from the Raspberry Pi. On the RC-600, configure ASSIGN mappings (Menu → ASSIGN):
+The RC-600 must be configured to receive MIDI control from the Raspberry Pi.
+
+**Understanding ASSIGN mappings:**
+In the RC-600 ASSIGN menu (Menu → ASSIGN), you configure:
+- **SOURCE**: What triggers the action (e.g., CC#1, footswitch, expression pedal)
+- **TARGET**: What action happens (e.g., TRK1 REC/PLAY, TRK1 CLEAR)
+
+**REC/PLAY vs REC/DUB modes:**
+- **REC/PLAY**: Record → Play (no overdub). Use this for tracks under automatic control (tracks 1-2) to ensure predictable behavior.
+- **REC/DUB**: Record → Play → Overdub. Can be used for manual tracks (3-6) if you want layering capability.
+
+The cybernetic control system uses discrete state changes (record fresh, play, stop, clear) rather than gradual accumulation, so overdubbing would make the system's behavior less predictable and harder to regulate.
 
 **Essential mappings (tracks 1-2 for ultrastable control):**
-- ASSIGN1-2: CC#1-2 → TRK1-2 REC/DB (TOGGLE mode)
-- ASSIGN7-8: CC#11-12 → TRK1-2 STOP (TOGGLE mode)
-- ASSIGN13-14: CC#21-22 → TRK1-2 CLEAR (TOGGLE mode)
-- ASSIGN15-16: CC#30,32 → TRK1-2 LEVEL (CONTINUOUS mode)
-- ASSIGN17: CC#31 → TRK1 SPEED (CONTINUOUS mode, if available)
+- ASSIGN1: SOURCE=CC#1, TARGET=TRK1 REC/PLAY, MODE=TOGGLE
+- ASSIGN2: SOURCE=CC#2, TARGET=TRK2 REC/PLAY, MODE=TOGGLE
+- ASSIGN3: SOURCE=CC#3, TARGET=TRK1 STOP, MODE=TOGGLE
+- ASSIGN4: SOURCE=CC#4, TARGET=TRK2 STOP, MODE=TOGGLE
+- ASSIGN5: SOURCE=CC#5, TARGET=TRK1 CLEAR, MODE=TOGGLE
+- ASSIGN6: SOURCE=CC#6, TARGET=TRK2 CLEAR, MODE=TOGGLE
+- ASSIGN7: SOURCE=CC#7, TARGET=TRK1 LEVEL, MODE=CONTINUOUS
+- ASSIGN8: SOURCE=CC#8, TARGET=TRK2 LEVEL, MODE=CONTINUOUS
+- ASSIGN9: SOURCE=CC#9, TARGET=TRK1 SPEED, MODE=CONTINUOUS
 
 **Optional mappings (tracks 3-6 for manual control):**
-- ASSIGN3-6: CC#3-6 → TRK3-6 REC/DB (TOGGLE mode)
-- ASSIGN9-12: CC#13-16 → TRK3-6 STOP (TOGGLE mode)
+- ASSIGN10-13: SOURCE=CC#11-14, TARGET=TRK3-6 REC/PLAY or REC/DUB, MODE=TOGGLE
+- ASSIGN14-17: SOURCE=CC#15-18, TARGET=TRK3-6 STOP, MODE=TOGGLE
+- ASSIGN18-19: SOURCE=CC#19-20, TARGET=TRK3-4 CLEAR, MODE=TOGGLE
 
-**RC-600 MIDI settings:**
+**RC-600 global MIDI settings:**
 - RX CH CTL: 1 (or match channel in `config/runtime.exs`)
 - CLOCK SYNC: MIDI or AUTO (if syncing to external clock)
 
