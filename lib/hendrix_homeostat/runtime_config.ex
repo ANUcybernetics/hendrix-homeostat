@@ -10,17 +10,17 @@ defmodule HendrixHomeostat.RuntimeConfig do
       # Get current configuration
       RuntimeConfig.get()
 
-      # Update comfort zone maximum (louder)
-      RuntimeConfig.set(:comfort_zone_max, 0.7)
+      # Update too_loud threshold (make it louder before dampening)
+      RuntimeConfig.set(:too_loud, 0.9)
 
-      # Update comfort zone minimum
-      RuntimeConfig.set(:comfort_zone_min, 0.3)
+      # Update too_quiet threshold (make it quieter before exciting)
+      RuntimeConfig.set(:too_quiet, 0.05)
 
-      # Update minimum action interval (slower changes)
-      RuntimeConfig.set(:min_action_interval, 5000)
+      # Update oscillation threshold (how many crossings before parameter change)
+      RuntimeConfig.set(:oscillation_threshold, 8)
 
       # Update multiple values at once
-      RuntimeConfig.update(%{comfort_zone_max: 0.6, min_action_interval: 3000})
+      RuntimeConfig.update(%{too_loud: 0.85, too_quiet: 0.08})
 
       # Reset to defaults from config
       RuntimeConfig.reset()
@@ -30,16 +30,9 @@ defmodule HendrixHomeostat.RuntimeConfig do
   require Logger
 
   @config_keys [
-    :critical_high,
-    :comfort_zone_min,
-    :comfort_zone_max,
-    :critical_low,
-    :stability_threshold,
-    :stability_duration,
-    :ultrastable_oscillation_threshold,
-    :ultrastable_min_duration,
-    :stuck_track_threshold,
-    :min_action_interval
+    :too_loud,
+    :too_quiet,
+    :oscillation_threshold
   ]
 
   def child_spec(opts) do
@@ -94,17 +87,9 @@ defmodule HendrixHomeostat.RuntimeConfig do
     control_config = Application.fetch_env!(:hendrix_homeostat, :control)
 
     state = %{
-      critical_high: Keyword.fetch!(control_config, :critical_high),
-      comfort_zone_min: Keyword.fetch!(control_config, :comfort_zone_min),
-      comfort_zone_max: Keyword.fetch!(control_config, :comfort_zone_max),
-      critical_low: Keyword.fetch!(control_config, :critical_low),
-      stability_threshold: Keyword.fetch!(control_config, :stability_threshold),
-      stability_duration: Keyword.fetch!(control_config, :stability_duration),
-      ultrastable_oscillation_threshold:
-        Keyword.get(control_config, :ultrastable_oscillation_threshold, 10),
-      ultrastable_min_duration: Keyword.get(control_config, :ultrastable_min_duration, 60_000),
-      stuck_track_threshold: Keyword.get(control_config, :stuck_track_threshold, 5),
-      min_action_interval: Keyword.get(control_config, :min_action_interval, 2000),
+      too_loud: Keyword.fetch!(control_config, :too_loud),
+      too_quiet: Keyword.fetch!(control_config, :too_quiet),
+      oscillation_threshold: Keyword.fetch!(control_config, :oscillation_threshold),
       defaults: control_config
     }
 
@@ -150,17 +135,9 @@ defmodule HendrixHomeostat.RuntimeConfig do
     control_config = state.defaults
 
     new_state = %{
-      critical_high: Keyword.fetch!(control_config, :critical_high),
-      comfort_zone_min: Keyword.fetch!(control_config, :comfort_zone_min),
-      comfort_zone_max: Keyword.fetch!(control_config, :comfort_zone_max),
-      critical_low: Keyword.fetch!(control_config, :critical_low),
-      stability_threshold: Keyword.fetch!(control_config, :stability_threshold),
-      stability_duration: Keyword.fetch!(control_config, :stability_duration),
-      ultrastable_oscillation_threshold:
-        Keyword.get(control_config, :ultrastable_oscillation_threshold, 10),
-      ultrastable_min_duration: Keyword.get(control_config, :ultrastable_min_duration, 60_000),
-      stuck_track_threshold: Keyword.get(control_config, :stuck_track_threshold, 5),
-      min_action_interval: Keyword.get(control_config, :min_action_interval, 2000),
+      too_loud: Keyword.fetch!(control_config, :too_loud),
+      too_quiet: Keyword.fetch!(control_config, :too_quiet),
+      oscillation_threshold: Keyword.fetch!(control_config, :oscillation_threshold),
       defaults: control_config
     }
 

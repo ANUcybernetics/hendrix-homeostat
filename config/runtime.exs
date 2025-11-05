@@ -33,16 +33,9 @@ if target == :host do
       channel: 1
     ],
     control: [
-      critical_high: 0.8,
-      comfort_zone_min: 0.2,
-      comfort_zone_max: 0.5,
-      critical_low: 0.05,
-      stability_threshold: 0.02,
-      stability_duration: 30_000,
-      ultrastable_oscillation_threshold: 10,
-      ultrastable_min_duration: 60_000,
-      stuck_track_threshold: 5,
-      min_action_interval: 2000
+      too_loud: 0.8,
+      too_quiet: 0.1,
+      oscillation_threshold: 6
     ],
     rc600_cc_map: [
       track1_rec_play: 1,
@@ -86,16 +79,9 @@ else
       channel: 1
     ],
     control: [
-      critical_high: 0.8,
-      comfort_zone_min: 0.2,
-      comfort_zone_max: 0.5,
-      critical_low: 0.05,
-      stability_threshold: 0.02,
-      stability_duration: 30_000,
-      ultrastable_oscillation_threshold: 10,
-      ultrastable_min_duration: 60_000,
-      stuck_track_threshold: 5,
-      min_action_interval: 2000
+      too_loud: 0.8,
+      too_quiet: 0.1,
+      oscillation_threshold: 6
     ],
     rc600_cc_map: [
       track1_rec_play: 1,

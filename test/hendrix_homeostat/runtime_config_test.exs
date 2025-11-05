@@ -13,36 +13,36 @@ defmodule HendrixHomeostat.RuntimeConfigTest do
   test "initializes with defaults from application config" do
     config = RuntimeConfig.get()
 
-    assert config.critical_high == 0.8
-    assert config.comfort_zone_min == 0.2
-    assert config.comfort_zone_max == 0.5
-    assert config.min_action_interval == 2000
+    assert config.too_loud == 0.8
+    assert config.too_quiet == 0.1
+    assert config.oscillation_threshold == 6
   end
 
   test "get/1 returns specific configuration value" do
-    assert RuntimeConfig.get(:comfort_zone_max) == 0.5
-    assert RuntimeConfig.get(:min_action_interval) == 2000
+    assert RuntimeConfig.get(:too_loud) == 0.8
+    assert RuntimeConfig.get(:too_quiet) == 0.1
+    assert RuntimeConfig.get(:oscillation_threshold) == 6
   end
 
   test "set/2 updates a single value" do
-    RuntimeConfig.set(:comfort_zone_max, 0.7)
-    assert RuntimeConfig.get(:comfort_zone_max) == 0.7
+    RuntimeConfig.set(:too_loud, 0.9)
+    assert RuntimeConfig.get(:too_loud) == 0.9
     # Other values unchanged
-    assert RuntimeConfig.get(:comfort_zone_min) == 0.2
+    assert RuntimeConfig.get(:too_quiet) == 0.1
   end
 
   test "update/1 updates multiple values at once" do
-    RuntimeConfig.update(%{comfort_zone_max: 0.6, min_action_interval: 3000})
+    RuntimeConfig.update(%{too_loud: 0.85, oscillation_threshold: 8})
 
     config = RuntimeConfig.get()
-    assert config.comfort_zone_max == 0.6
-    assert config.min_action_interval == 3000
+    assert config.too_loud == 0.85
+    assert config.oscillation_threshold == 8
   end
 
   test "reset/0 restores defaults" do
-    RuntimeConfig.set(:comfort_zone_max, 0.9)
+    RuntimeConfig.set(:too_loud, 0.9)
     RuntimeConfig.reset()
 
-    assert RuntimeConfig.get(:comfort_zone_max) == 0.5
+    assert RuntimeConfig.get(:too_loud) == 0.8
   end
 end

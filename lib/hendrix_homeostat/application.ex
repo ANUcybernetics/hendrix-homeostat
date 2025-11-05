@@ -93,33 +93,19 @@ defmodule HendrixHomeostat.Application do
       raise "control configuration must be a keyword list"
     end
 
-    critical_high = Keyword.fetch!(control, :critical_high)
-    comfort_zone_min = Keyword.fetch!(control, :comfort_zone_min)
-    comfort_zone_max = Keyword.fetch!(control, :comfort_zone_max)
-    critical_low = Keyword.fetch!(control, :critical_low)
-    stability_threshold = Keyword.fetch!(control, :stability_threshold)
-    stability_duration = Keyword.fetch!(control, :stability_duration)
+    too_loud = Keyword.fetch!(control, :too_loud)
+    too_quiet = Keyword.fetch!(control, :too_quiet)
+    oscillation_threshold = Keyword.fetch!(control, :oscillation_threshold)
 
-    validate_threshold!(:critical_high, critical_high)
-    validate_threshold!(:comfort_zone_min, comfort_zone_min)
-    validate_threshold!(:comfort_zone_max, comfort_zone_max)
-    validate_threshold!(:critical_low, critical_low)
-    validate_threshold!(:stability_threshold, stability_threshold)
+    validate_threshold!(:too_loud, too_loud)
+    validate_threshold!(:too_quiet, too_quiet)
 
-    unless is_integer(stability_duration) and stability_duration > 0 do
-      raise "control.stability_duration must be a positive integer (milliseconds)"
+    unless is_integer(oscillation_threshold) and oscillation_threshold > 0 do
+      raise "control.oscillation_threshold must be a positive integer"
     end
 
-    unless critical_low < comfort_zone_min do
-      raise "control.critical_low must be less than control.comfort_zone_min"
-    end
-
-    unless comfort_zone_min < comfort_zone_max do
-      raise "control.comfort_zone_min must be less than control.comfort_zone_max"
-    end
-
-    unless comfort_zone_max < critical_high do
-      raise "control.comfort_zone_max must be less than control.critical_high"
+    unless too_quiet < too_loud do
+      raise "control.too_quiet must be less than control.too_loud"
     end
   end
 

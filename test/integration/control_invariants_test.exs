@@ -8,10 +8,12 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
   @moduledoc """
   Integration tests for core system invariants.
 
-  These tests verify the fundamental behavior of the control system
-  without testing specific implementation details like exact CC numbers
-  or which tracks are controlled. This allows the algorithm to evolve
-  while maintaining confidence in core functionality.
+  These tests verify the fundamental behavior of the simplified control system
+  without testing specific implementation details. The tests focus on:
+  - System responds to extreme RMS values
+  - Valid MIDI messages are sent
+  - State is maintained correctly
+  - Oscillation triggers parameter changes
   """
 
   setup do
@@ -24,7 +26,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
   end
 
   describe "core control loop invariants" do
-    test "control loop responds to metrics by making decisions" do
+    test "control loop responds to extreme high metrics" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
       InMemory.clear_history()
@@ -33,7 +35,19 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
       Process.sleep(50)
 
       history = InMemory.get_history()
-      assert length(history) > 0, "Control loop should respond to extreme metrics"
+      assert length(history) > 0, "Control loop should respond to extreme high metrics"
+    end
+
+    test "control loop responds to extreme low metrics" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      send(control_pid, {:metrics, %{rms: 0.05, zcr: 0.5, peak: 0.05}})
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+      assert length(history) > 0, "Control loop should respond to extreme low metrics"
     end
 
     test "control loop sends valid MIDI messages" do
@@ -66,87 +80,24 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
       Process.sleep(100)
 
       state = :sys.get_state(control_pid)
-      assert state.current_metrics != nil, "Should have stored latest metrics"
-      assert is_list(state.metrics_history), "Should maintain metrics history"
+      assert state.current_rms != nil, "Should have stored latest RMS"
+      assert is_list(state.transition_history), "Should maintain transition history"
     end
 
-    test "comfort zone metrics do not immediately trigger actions" do
+    test "ok zone metrics do not trigger immediate actions" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
       InMemory.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
+      send(control_pid, {:metrics, %{rms: 0.5, zcr: 0.5, peak: 0.5}})
+      send(control_pid, {:metrics, %{rms: 0.4, zcr: 0.5, peak: 0.4}})
       Process.sleep(50)
 
       history = InMemory.get_history()
 
       assert length(history) == 0,
-             "Comfort zone metrics should not trigger immediate actions"
-    end
-
-    test "extreme high values trigger control response" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      InMemory.clear_history()
-
-      send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
-      Process.sleep(50)
-
-      history = InMemory.get_history()
-
-      assert length(history) > 0, "Extreme high values should trigger response"
-    end
-
-    test "extreme low values trigger control response" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      InMemory.clear_history()
-
-      send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
-      Process.sleep(50)
-
-      history = InMemory.get_history()
-
-      assert length(history) > 0, "Extreme low values should trigger response"
-    end
-
-    test "control loop tracks time of last action" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      initial_state = :sys.get_state(control_pid)
-      assert initial_state.last_action_timestamp == nil
-
-      send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
-      Process.sleep(50)
-
-      final_state = :sys.get_state(control_pid)
-
-      history = InMemory.get_history()
-
-      if length(history) > 0 do
-        assert final_state.last_action_timestamp != nil,
-               "Should track timestamp after action"
-
-        assert is_integer(final_state.last_action_timestamp),
-               "Timestamp should be an integer"
-      end
-    end
-
-    test "control loop maintains bounded metrics history" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      for i <- 1..100 do
-        rms = 0.3 + i * 0.001
-        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
-      end
-
-      Process.sleep(100)
-
-      state = :sys.get_state(control_pid)
-
-      assert length(state.metrics_history) <= 30,
-             "Metrics history should be bounded to prevent memory growth"
+             "Ok zone metrics should not trigger actions"
     end
   end
 
@@ -178,123 +129,78 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
   end
 
   describe "configuration integration" do
-    test "control loop reads thresholds from config" do
+    test "control loop reads configuration from RuntimeConfig" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
       state = :sys.get_state(control_pid)
       config = state.config
 
-      assert is_float(config.critical_high)
-      assert is_float(config.critical_low)
-      assert is_float(config.comfort_zone_min)
-      assert is_float(config.comfort_zone_max)
+      assert is_float(config.too_loud)
+      assert is_float(config.too_quiet)
+      assert is_integer(config.oscillation_threshold)
 
-      assert config.critical_high >= 0.0 and config.critical_high <= 1.0
-      assert config.critical_low >= 0.0 and config.critical_low <= 1.0
-
-      assert config.critical_low < config.comfort_zone_min
-      assert config.comfort_zone_min < config.comfort_zone_max
-      assert config.comfort_zone_max < config.critical_high
-    end
-
-    test "control loop loads stability configuration" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      state = :sys.get_state(control_pid)
-      config = state.config
-
-      assert is_float(config.stability_threshold)
-      assert is_integer(config.stability_duration)
-      assert config.stability_threshold > 0.0
-      assert config.stability_duration > 0
+      assert config.too_loud >= 0.0 and config.too_loud <= 1.0
+      assert config.too_quiet >= 0.0 and config.too_quiet <= 1.0
+      assert config.too_quiet < config.too_loud
     end
   end
 
-  describe "metric pattern responses" do
-    test "responds differently to sustained high vs brief spike" do
+  describe "oscillation response" do
+    test "repeated oscillation triggers ultrastable reconfiguration" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
       InMemory.clear_history()
 
-      for _ <- 1..5 do
-        send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
+      # Create sustained oscillation pattern
+      for i <- 1..20 do
+        rms = if rem(i, 2) == 0, do: 0.9, else: 0.05
+        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
         Process.sleep(10)
       end
 
-      sustained_history = InMemory.get_history()
-      assert length(sustained_history) > 0, "Sustained high should trigger action"
+      Process.sleep(100)
+
+      history = InMemory.get_history()
+
+      # Should have sent volume change commands during ultrastable reconfiguration
+      volume_changes =
+        Enum.filter(history, fn
+          {:control_change, _, cc, _, _} ->
+            # Track volume CCs (7 and 8 based on rc600_cc_map)
+            cc in [7, 8]
+
+          _ ->
+            false
+        end)
+
+      assert length(volume_changes) > 0,
+             "Sustained oscillation should trigger volume parameter changes"
+    end
+
+    test "non-oscillating behavior does not trigger reconfiguration" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
 
       InMemory.clear_history()
 
-      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      # Send just a few extremes, not enough to be considered oscillating
       send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
-      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
+      Process.sleep(20)
+      send(control_pid, {:metrics, %{rms: 0.05, zcr: 0.5, peak: 0.05}})
+      Process.sleep(20)
+      send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
       Process.sleep(50)
 
-      spike_history = InMemory.get_history()
-      assert length(spike_history) > 0, "Brief spike should still trigger action"
-    end
-
-    test "handles gradual increase in level" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      InMemory.clear_history()
-
-      for i <- 1..10 do
-        rms = 0.1 + i * 0.08
-        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
-        Process.sleep(10)
-      end
-
       history = InMemory.get_history()
 
-      assert length(history) > 0, "Gradual increase should eventually trigger action"
-    end
+      # Should have track control messages but no volume changes
+      volume_changes =
+        Enum.filter(history, fn
+          {:control_change, _, cc, _, _} -> cc in [7, 8]
+          _ -> false
+        end)
 
-    test "handles alternating high and low levels" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      InMemory.clear_history()
-
-      for i <- 1..10 do
-        rms = if rem(i, 2) == 0, do: 0.9, else: 0.01
-        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
-        Process.sleep(10)
-      end
-
-      history = InMemory.get_history()
-
-      assert length(history) > 0, "Alternating levels should trigger multiple actions"
-    end
-
-    test "stable comfort zone does not trigger actions within short duration" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      InMemory.clear_history()
-
-      for _ <- 1..10 do
-        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-        Process.sleep(10)
-      end
-
-      history = InMemory.get_history()
-
-      assert length(history) == 0,
-             "Stable comfort zone should not trigger actions in short duration"
-    end
-
-    test "metrics history captures recent activity" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      send(control_pid, {:metrics, %{rms: 0.4, zcr: 0.5, peak: 0.4}})
-      send(control_pid, {:metrics, %{rms: 0.35, zcr: 0.5, peak: 0.35}})
-      Process.sleep(50)
-
-      state = :sys.get_state(control_pid)
-
-      assert length(state.metrics_history) >= 3, "Should track recent metrics"
-      assert Enum.all?(state.metrics_history, &is_float/1), "History should contain RMS values"
+      assert length(volume_changes) == 0,
+             "Limited transitions should not trigger parameter changes"
     end
   end
 
@@ -325,72 +231,78 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
       InMemory.clear_history()
 
       for i <- 1..5 do
-        rms = if rem(i, 2) == 0, do: 0.9, else: 0.01
+        rms = if rem(i, 2) == 0, do: 0.9, else: 0.05
         send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
         Process.sleep(20)
       end
 
       history = InMemory.get_history()
 
-      timestamps = Enum.map(history, fn {:control_change, _, _, _, ts} -> ts end)
+      if length(history) >= 2 do
+        timestamps = Enum.map(history, fn {:control_change, _, _, _, ts} -> ts end)
+        sorted_timestamps = Enum.sort(timestamps, DateTime)
 
-      sorted_timestamps = Enum.sort(timestamps)
-
-      assert timestamps == sorted_timestamps,
-             "Timestamps should be monotonically increasing"
+        assert timestamps == sorted_timestamps,
+               "Timestamps should be monotonically increasing"
+      end
     end
   end
 
-  describe "history management" do
-    test "history is properly bounded at configured size" do
+  describe "realistic control scenarios" do
+    test "gradual increase in level eventually triggers action" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      for i <- 1..50 do
-        rms = 0.3 + rem(i, 5) * 0.01
+      InMemory.clear_history()
+
+      # Gradually increase RMS
+      for i <- 1..10 do
+        rms = 0.1 + i * 0.08
         send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
+        Process.sleep(10)
+      end
+
+      history = InMemory.get_history()
+
+      assert length(history) > 0, "Gradual increase should eventually trigger action"
+    end
+
+    test "stable ok zone maintains state without actions" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      # Send many samples in the ok zone
+      for _ <- 1..20 do
+        send(control_pid, {:metrics, %{rms: 0.5, zcr: 0.5, peak: 0.5}})
+        Process.sleep(5)
+      end
+
+      Process.sleep(50)
+
+      history = InMemory.get_history()
+
+      assert length(history) == 0, "Stable ok zone should not trigger actions"
+    end
+
+    test "alternating extremes creates oscillation" do
+      {:ok, control_pid} = start_supervised(ControlLoop)
+
+      InMemory.clear_history()
+
+      # Create clear oscillation pattern
+      for i <- 1..15 do
+        rms = if rem(i, 2) == 0, do: 0.95, else: 0.02
+        send(control_pid, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
+        Process.sleep(10)
       end
 
       Process.sleep(100)
 
       state = :sys.get_state(control_pid)
 
-      assert length(state.metrics_history) <= 30,
-             "History should be bounded to prevent unbounded growth"
-    end
-
-    test "history clears after control action" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      for _ <- 1..5 do
-        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      end
-
-      Process.sleep(50)
-
-      state_before = :sys.get_state(control_pid)
-      history_before = length(state_before.metrics_history)
-
-      send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
-      Process.sleep(50)
-
-      state_after = :sys.get_state(control_pid)
-      history_after = length(state_after.metrics_history)
-
-      assert history_after < history_before,
-             "History should be cleared or reset after action"
-    end
-
-    test "most recent metrics are always accessible" do
-      {:ok, control_pid} = start_supervised(ControlLoop)
-
-      last_metrics = %{rms: 0.42, zcr: 0.5, peak: 0.42}
-      send(control_pid, {:metrics, last_metrics})
-      Process.sleep(50)
-
-      state = :sys.get_state(control_pid)
-
-      assert state.current_metrics == last_metrics,
-             "Current metrics should reflect most recent update"
+      # Transition history should show the pattern
+      assert length(state.transition_history) > 0,
+             "Alternating extremes should be recorded as transitions"
     end
   end
 end
