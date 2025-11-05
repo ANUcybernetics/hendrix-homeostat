@@ -99,7 +99,7 @@ To run commands (tests, IEx sessions, etc.) on the target device, use ht-mcp:
 
 ```elixir
 # Create an SSH session to the target
-mcp__ht-mcp__ht_create_session(command: ["ssh", "nerves.local"], enableWebServer: true)
+mcp__ht-mcp__ht_create_session(command: ["ssh", "jimi.local"], enableWebServer: true)
 
 # Execute commands on the target
 mcp__ht-mcp__ht_execute_command(sessionId: "session-id", command: "mise exec -- mix test --only target_only")

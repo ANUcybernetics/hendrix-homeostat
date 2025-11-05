@@ -107,5 +107,7 @@ else
     backends: [
       midi_backend: HendrixHomeostat.MidiBackend.Amidi,
       audio_backend: HendrixHomeostat.AudioBackend.Port
-    ]
+    ],
+    tailscale_auth_key: System.get_env("TAILSCALE_AUTH_KEY"),
+    tailscale_hostname: "jimi"
 end
