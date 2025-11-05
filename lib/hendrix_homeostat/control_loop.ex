@@ -5,16 +5,21 @@ defmodule HendrixHomeostat.ControlLoop do
   This module implements a double feedback loop for adaptive audio control:
 
   ## First-Order Loop (Homeostasis)
-  Maintains audio level (RMS) within bounds by starting/stopping loop tracks:
-  - RMS ≥ critical_high → Stop random track (damping)
-  - RMS ≤ critical_low → Start recording (excitation, allows overdubbing)
-  - Stable too long → Clear track (anti-stasis)
+  Actively seeks and maintains audio level (RMS) within the comfort zone (0.2-0.5):
+  - RMS ≥ critical_high (0.8) → Stop random track (emergency damping)
+  - RMS < comfort_zone_min (0.2) → Start recording (excitation, including from silence)
+  - RMS > comfort_zone_max (0.5) → Stop random track (gentle damping)
+  - Stable too long in comfort zone → Clear track (anti-stasis)
+
+  The system actively seeks equilibrium in the comfort zone rather than passively
+  waiting at extremes. Silence triggers excitation just like being too quiet.
 
   ## Second-Order Loop (Ultrastability)
   When the first-order loop fails to achieve stability (e.g., oscillating between
-  extremes), the system randomly changes track volume parameters to find a configuration
-  that can stabilize. This is analogous to Ashby's uniselector mechanism, which randomly
-  changed circuit parameters until equilibrium was found.
+  too quiet and too loud), the system randomly changes track volume parameters to find
+  a configuration that can stabilize in the comfort zone. This is analogous to Ashby's
+  uniselector mechanism, which randomly changed circuit parameters until equilibrium
+  was found.
 
   ## Overdubbing Behavior
   The system embraces overdubbing as part of its emergent complexity:
@@ -146,12 +151,20 @@ defmodule HendrixHomeostat.ControlLoop do
       rms = state.current_metrics.rms
 
       cond do
+        # Critical high: too loud, dampen immediately
         rms >= state.config.critical_high ->
           handle_critical_high(state)
 
-        rms <= state.config.critical_low ->
-          handle_critical_low(state)
+        # Below comfort zone: too quiet (including silence), excite
+        # This actively seeks the comfort zone rather than waiting for critical_low
+        rms < state.config.comfort_zone_min ->
+          handle_below_comfort_zone(state)
 
+        # Above comfort zone but not critical: gentle management
+        rms > state.config.comfort_zone_max ->
+          handle_above_comfort_zone(state)
+
+        # In comfort zone: maintain with anti-stasis
         in_comfort_zone?(rms, state.config) ->
           handle_comfort_zone(state)
 
@@ -179,13 +192,14 @@ defmodule HendrixHomeostat.ControlLoop do
   end
 
   defp excessive_oscillation?(history, config) do
-    # Count transitions between critical_high and critical_low
+    # Count transitions between below comfort zone and critical_high
+    # This detects when the system can't stabilize in the comfort zone
     critical_crossings =
       history
       |> Enum.chunk_every(2, 1, :discard)
       |> Enum.count(fn [a, b] ->
-        (a.rms <= config.critical_low and b.rms >= config.critical_high) or
-          (a.rms >= config.critical_high and b.rms <= config.critical_low)
+        (a.rms < config.comfort_zone_min and b.rms >= config.critical_high) or
+          (a.rms >= config.critical_high and b.rms < config.comfort_zone_min)
       end)
 
     critical_crossings >= config.ultrastable_oscillation_threshold
@@ -266,16 +280,43 @@ defmodule HendrixHomeostat.ControlLoop do
     end
   end
 
-  defp handle_critical_low(state) do
+  defp handle_below_comfort_zone(state) do
     track = Enum.random(1..2)
 
     Logger.debug(
-      "Critical low detected, starting recording on track #{track} (may overdub if playing)"
+      "Below comfort zone (RMS: #{Float.round(state.current_metrics.rms, 3)}), " <>
+        "starting recording on track #{track} and boosting volume to build up sound"
     )
 
+    # Start recording to capture material (even if just ambient noise)
     HendrixHomeostat.MidiController.start_recording(track)
 
+    # Boost volume to make even quiet material audible
+    # Ultrastability will find the right level if this causes oscillation
+    HendrixHomeostat.MidiController.set_track_volume(track, 127)
+
     new_action_history = record_action(state.action_history, {:start, track})
+
+    %{
+      state
+      | last_action_timestamp: System.monotonic_time(:millisecond),
+        metrics_history: [],
+        action_history: new_action_history
+    }
+  end
+
+  defp handle_above_comfort_zone(state) do
+    # Above comfort zone but below critical - use gentler control
+    track = Enum.random(1..2)
+
+    Logger.debug(
+      "Above comfort zone (RMS: #{Float.round(state.current_metrics.rms, 3)}), " <>
+        "stopping track #{track} to reduce level"
+    )
+
+    HendrixHomeostat.MidiController.stop_track(track)
+
+    new_action_history = record_action(state.action_history, {:stop, track})
 
     %{
       state
