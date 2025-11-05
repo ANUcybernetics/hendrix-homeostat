@@ -75,13 +75,13 @@ else
     audio: [
       sample_rate: 48000,
       buffer_size: 4800,
-      device_name: "hw:0,0",
+      device_name: "hw:CARD=R24,DEV=0",
       update_rate: 10,
       format: "S32_LE",
       channels: 6
     ],
     midi: [
-      device_name: "hw:0,0,0",
+      device_name: "hw:CARD=R24,DEV=0",
       channel: 1
     ],
     control: [

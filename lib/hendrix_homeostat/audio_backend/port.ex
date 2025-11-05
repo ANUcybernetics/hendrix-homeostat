@@ -39,6 +39,7 @@ defmodule HendrixHomeostat.AudioBackend.Port do
       :binary,
       :stream,
       :exit_status,
+      :stderr_to_stdout,
       args: [
         "-D",
         device_name,
@@ -74,6 +75,11 @@ defmodule HendrixHomeostat.AudioBackend.Port do
 
   @impl GenServer
   def handle_info({port, {:data, data}}, state) when port == state.port do
+    # Log any text data (stderr from arecord) as warnings
+    if String.printable?(data) do
+      Logger.warning("arecord stderr: #{String.trim(data)}")
+    end
+
     {:noreply, %{state | accumulator: state.accumulator <> data}}
   end
 
@@ -85,7 +91,7 @@ defmodule HendrixHomeostat.AudioBackend.Port do
 
   @impl GenServer
   def terminate(_reason, state) do
-    if state.port do
+    if state.port && Port.info(state.port) != nil do
       Port.close(state.port)
     end
 
