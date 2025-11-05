@@ -35,7 +35,7 @@ defmodule HendrixHomeostat.MidiController do
     send_control_change(cc, 127)
   end
 
-  def clear_track(track_number) when track_number >= 1 and track_number <= 6 do
+  def clear_track(track_number) when track_number >= 1 and track_number <= 4 do
     cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
     cc = get_track_cc(cc_map, track_number, :clear)
     send_control_change(cc, 127)
@@ -49,7 +49,7 @@ defmodule HendrixHomeostat.MidiController do
   end
 
   def clear_all_tracks do
-    Enum.each(1..6, &clear_track/1)
+    Enum.each(1..4, &clear_track/1)
   end
 
   defp get_track_cc(cc_map, track_number, action) do
