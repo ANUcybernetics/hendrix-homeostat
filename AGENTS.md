@@ -18,7 +18,8 @@ running on Raspberry Pi 5 to control a guitar feedback loop system.
 - use GenServers for audio monitoring and control logic
 - leverage OTP supervision trees for fault tolerance
 - use Nerves-specific libraries for audio/MIDI interface
-- target is `:rpi5`, development target is `:host`, always specify the correct one e.g. `MIX_TARGET="host" mix test`
+- target is `:rpi5`, development target is `:host`, always specify the correct one e.g. `MIX_TARGET="host" mise exec -- mix test`
+- **IMPORTANT**: Always use `mise exec -- mix ...` instead of just `mix ...` to ensure correct Elixir/Erlang versions
 
 ### Audio processing
 
@@ -60,7 +61,7 @@ homeostat:
 
 - always set `MIX_TARGET=rpi5` for target builds, or use `:host` for local
   testing
-- use `mix firmware` and `mix burn` for deployment to hardware
+- use `mise exec -- mix firmware` and `mise exec -- mix burn` for deployment to hardware
 - test audio processing logic on `:host` target when possible before burning to
   device
 
@@ -75,13 +76,13 @@ Most tests run on host without requiring hardware:
 
 ```bash
 # Run all tests on host (default, works in standard shell)
-MIX_TARGET=host mix test
+MIX_TARGET=host mise exec -- mix test
 
 # Run specific test file
-MIX_TARGET=host mix test test/path/to/test.exs
+MIX_TARGET=host mise exec -- mix test test/path/to/test.exs
 
 # Run integration tests only
-MIX_TARGET=host mix test test/integration/
+MIX_TARGET=host mise exec -- mix test test/integration/
 ```
 
 ### Running tests on target device
@@ -91,7 +92,7 @@ the ht-mcp server for interactive SSH sessions:
 
 ```bash
 # On target hardware with real devices
-MIX_TARGET=rpi5 mix test --include target_only
+MIX_TARGET=rpi5 mise exec -- mix test --include target_only
 ```
 
 To run commands (tests, IEx sessions, etc.) on the target device, use ht-mcp:
@@ -101,10 +102,10 @@ To run commands (tests, IEx sessions, etc.) on the target device, use ht-mcp:
 mcp__ht-mcp__ht_create_session(command: ["ssh", "nerves.local"], enableWebServer: true)
 
 # Execute commands on the target
-mcp__ht-mcp__ht_execute_command(sessionId: "session-id", command: "mix test --only target_only")
+mcp__ht-mcp__ht_execute_command(sessionId: "session-id", command: "mise exec -- mix test --only target_only")
 
 # Or start an IEx session
-mcp__ht-mcp__ht_send_keys(sessionId: "session-id", keys: ["iex -S mix", "Enter"])
+mcp__ht-mcp__ht_send_keys(sessionId: "session-id", keys: ["mise exec -- iex -S mix", "Enter"])
 ```
 
 ### Test types
@@ -154,38 +155,38 @@ They are your best source of knowledge for making decisions.
 ## Modules & functions in the current app and dependencies
 
 When looking for docs for modules & functions that are dependencies of the current project,
-or for Elixir itself, use `mix usage_rules.docs`
+or for Elixir itself, use `mise exec -- mix usage_rules.docs`
 
 ```
 # Search a whole module
-mix usage_rules.docs Enum
+mise exec -- mix usage_rules.docs Enum
 
 # Search a specific function
-mix usage_rules.docs Enum.zip
+mise exec -- mix usage_rules.docs Enum.zip
 
 # Search a specific function & arity
-mix usage_rules.docs Enum.zip/1
+mise exec -- mix usage_rules.docs Enum.zip/1
 ```
 
 
 ## Searching Documentation
 
-You should also consult the documentation of any tools you are using, early and often. The best 
+You should also consult the documentation of any tools you are using, early and often. The best
 way to accomplish this is to use the `usage_rules.search_docs` mix task. Once you have
 found what you are looking for, use the links in the search results to get more detail. For example:
 
 ```
 # Search docs for all packages in the current application, including Elixir
-mix usage_rules.search_docs Enum.zip
+mise exec -- mix usage_rules.search_docs Enum.zip
 
 # Search docs for specific packages
-mix usage_rules.search_docs Req.get -p req
+mise exec -- mix usage_rules.search_docs Req.get -p req
 
 # Search docs for multi-word queries
-mix usage_rules.search_docs "making requests" -p req
+mise exec -- mix usage_rules.search_docs "making requests" -p req
 
 # Search only in titles (useful for finding specific functions/modules)
-mix usage_rules.search_docs "Enum.zip" --query-by title
+mise exec -- mix usage_rules.search_docs "Enum.zip" --query-by title
 ```
 
 
@@ -231,16 +232,16 @@ mix usage_rules.search_docs "Enum.zip" --query-by title
 
 ## Mix Tasks
 
-- Use `mix help` to list available mix tasks
-- Use `mix help task_name` to get docs for an individual task
+- Use `mise exec -- mix help` to list available mix tasks
+- Use `mise exec -- mix help task_name` to get docs for an individual task
 - Read the docs and options fully before using tasks
 
 ## Testing
-- Run tests in a specific file with `mix test test/my_test.exs` and a specific test with the line number `mix test path/to/test.exs:123`
-- Limit the number of failed tests with `mix test --max-failures n`
-- Use `@tag` to tag specific tests, and `mix test --only tag` to run only those tests
+- Run tests in a specific file with `mise exec -- mix test test/my_test.exs` and a specific test with the line number `mise exec -- mix test path/to/test.exs:123`
+- Limit the number of failed tests with `mise exec -- mix test --max-failures n`
+- Use `@tag` to tag specific tests, and `mise exec -- mix test --only tag` to run only those tests
 - Use `assert_raise` for testing expected exceptions: `assert_raise ArgumentError, fn -> invalid_function() end`
-- Use `mix help test` to for full documentation on running tests
+- Use `mise exec -- mix help test` to for full documentation on running tests
 
 ## Debugging
 
@@ -328,9 +329,9 @@ mix usage_rules.search_docs "Enum.zip" --query-by title
 
 ## Mix guidelines
 
-- Read the docs and options before using tasks (by using `mix help task_name`)
-- To debug test failures, run tests in a specific file with `mix test test/my_test.exs` or run all previously failed tests with `mix test --failed`
-- `mix deps.clean --all` is **almost never needed**. **Avoid** using it unless you have good reason
+- Read the docs and options before using tasks (by using `mise exec -- mix help task_name`)
+- To debug test failures, run tests in a specific file with `mise exec -- mix test test/my_test.exs` or run all previously failed tests with `mise exec -- mix test --failed`
+- `mise exec -- mix deps.clean --all` is **almost never needed**. **Avoid** using it unless you have good reason
 
 <!-- phoenix:elixir-end -->
 <!-- phoenix:html-start -->
