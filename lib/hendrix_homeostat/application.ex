@@ -14,6 +14,8 @@ defmodule HendrixHomeostat.Application do
       HendrixHomeostatWeb.Endpoint,
       # Runtime configuration (must start before ControlLoop)
       {HendrixHomeostat.RuntimeConfig, []},
+      # Tailscale (start early, before other network-dependent services)
+      {HendrixHomeostat.Tailscale, []},
       # Nerves components
       {HendrixHomeostat.MidiController, []},
       {HendrixHomeostat.AudioMonitor, []},
