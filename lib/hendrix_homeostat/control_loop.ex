@@ -257,7 +257,9 @@ defmodule HendrixHomeostat.ControlLoop do
     HendrixHomeostat.MidiController.set_track_volume(1, new_track1_volume)
     HendrixHomeostat.MidiController.set_track_volume(2, new_track2_volume)
 
-    Logger.debug("New params - Track1: vol=#{new_track1_volume}, Track2: vol=#{new_track2_volume}")
+    Logger.debug(
+      "New params - Track1: vol=#{new_track1_volume}, Track2: vol=#{new_track2_volume}"
+    )
 
     %{
       state

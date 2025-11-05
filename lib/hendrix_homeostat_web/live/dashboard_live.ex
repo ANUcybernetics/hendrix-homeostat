@@ -7,30 +7,32 @@ defmodule HendrixHomeostatWeb.DashboardLive do
       Phoenix.PubSub.subscribe(HendrixHomeostat.PubSub, "control_loop")
     end
 
-    {:ok, assign(socket, 
-      rms: 0.0,
-      zcr: 0.0,
-      peak: 0.0,
-      state: :idle,
-      track1_volume: 75,
-      track1_speed: 112,
-      track2_volume: 75,
-      last_action: nil,
-      stability_attempts: 0
-    )}
+    {:ok,
+     assign(socket,
+       rms: 0.0,
+       zcr: 0.0,
+       peak: 0.0,
+       state: :idle,
+       track1_volume: 75,
+       track1_speed: 112,
+       track2_volume: 75,
+       last_action: nil,
+       stability_attempts: 0
+     )}
   end
 
   @impl true
   def handle_info({:control_state, state}, socket) do
-    {:noreply, assign(socket,
-      rms: get_in(state, [:current_metrics, :rms]) || 0.0,
-      zcr: get_in(state, [:current_metrics, :zcr]) || 0.0,
-      peak: get_in(state, [:current_metrics, :peak]) || 0.0,
-      track1_volume: get_in(state, [:track1_params, :volume]) || 75,
-      track1_speed: get_in(state, [:track1_params, :speed]) || 112,
-      track2_volume: get_in(state, [:track2_params, :volume]) || 75,
-      stability_attempts: state[:stability_attempts] || 0
-    )}
+    {:noreply,
+     assign(socket,
+       rms: get_in(state, [:current_metrics, :rms]) || 0.0,
+       zcr: get_in(state, [:current_metrics, :zcr]) || 0.0,
+       peak: get_in(state, [:current_metrics, :peak]) || 0.0,
+       track1_volume: get_in(state, [:track1_params, :volume]) || 75,
+       track1_speed: get_in(state, [:track1_params, :speed]) || 112,
+       track2_volume: get_in(state, [:track2_params, :volume]) || 75,
+       stability_attempts: state[:stability_attempts] || 0
+     )}
   end
 
   def handle_info({:action_taken, action}, socket) do

@@ -105,7 +105,8 @@ config :hendrix_homeostat, HendrixHomeostatWeb.Endpoint,
   server: true,
   code_reloader: false,
   check_origin: false,
-  secret_key_base: "j3K8m9Lq7nRtWvXyZaBcDeFgHiJkMnOpQrStUvWxYz0A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0U1V2W3X4Y5Z6"
+  secret_key_base:
+    "j3K8m9Lq7nRtWvXyZaBcDeFgHiJkMnOpQrStUvWxYz0A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0U1V2W3X4Y5Z6"
 
 # Add HTTP service to mDNS for web UI
 config :mdns_lite,

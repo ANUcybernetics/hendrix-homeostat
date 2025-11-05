@@ -2,9 +2,9 @@ defmodule HendrixHomeostatWeb.CoreComponents do
   use Phoenix.Component
   alias Phoenix.LiveView.JS
 
-  attr :flash, :map, required: true, doc: "the map of flash messages"
-  attr :kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup"
-  attr :rest, :global, doc: "the arbitrary HTML attributes to add to the flash container"
+  attr(:flash, :map, required: true, doc: "the map of flash messages")
+  attr(:kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup")
+  attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
   def flash_group(assigns) do
     ~H"""
@@ -15,13 +15,13 @@ defmodule HendrixHomeostatWeb.CoreComponents do
     """
   end
 
-  attr :id, :string, doc: "the optional id of flash container"
-  attr :flash, :map, required: true, doc: "the map of flash messages to display"
-  attr :title, :string, default: nil
-  attr :kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup"
-  attr :rest, :global, doc: "the arbitrary HTML attributes to add to the flash container"
+  attr(:id, :string, doc: "the optional id of flash container")
+  attr(:flash, :map, required: true, doc: "the map of flash messages to display")
+  attr(:title, :string, default: nil)
+  attr(:kind, :atom, values: [:info, :error], doc: "used for styling and flash lookup")
+  attr(:rest, :global, doc: "the arbitrary HTML attributes to add to the flash container")
 
-  slot :inner_block, doc: "the optional inner block that renders the flash message"
+  slot(:inner_block, doc: "the optional inner block that renders the flash message")
 
   def flash(assigns) do
     assigns = assign_new(assigns, :id, fn -> "flash-#{assigns.kind}" end)
@@ -64,8 +64,8 @@ defmodule HendrixHomeostatWeb.CoreComponents do
     )
   end
 
-  attr :class, :string, default: nil
-  slot :inner_block, required: true
+  attr(:class, :string, default: nil)
+  slot(:inner_block, required: true)
 
   def card(assigns) do
     ~H"""
