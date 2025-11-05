@@ -94,7 +94,7 @@ defmodule HendrixHomeostat.ControlLoopTest do
 
   describe "state transitions" do
     test "tracks transition from ok to too_loud" do
-      send(ControlLoop, {:metrics, %{rms: 0.5, zcr: 0.5, peak: 0.5}})
+      send(ControlLoop, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
       Process.sleep(20)
 
       initial_state = :sys.get_state(ControlLoop)
@@ -109,7 +109,7 @@ defmodule HendrixHomeostat.ControlLoopTest do
     end
 
     test "tracks transition from ok to too_quiet" do
-      send(ControlLoop, {:metrics, %{rms: 0.5, zcr: 0.5, peak: 0.5}})
+      send(ControlLoop, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
       Process.sleep(20)
 
       send(ControlLoop, {:metrics, %{rms: 0.05, zcr: 0.5, peak: 0.05}})

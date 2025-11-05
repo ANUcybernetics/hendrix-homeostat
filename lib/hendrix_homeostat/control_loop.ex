@@ -6,7 +6,7 @@ defmodule HendrixHomeostat.ControlLoop do
 
   ## First-Order Loop (Basic Homeostasis)
   Simple negative feedback with just two thresholds:
-  - RMS ≥ too_loud (0.8) → Stop random track (damping)
+  - RMS ≥ too_loud (0.5) → Stop random track (damping)
   - RMS ≤ too_quiet (0.1) → Start recording on random track (excitation)
   - Everything else → Do nothing (let the environment provide complexity)
 

@@ -33,7 +33,7 @@ if target == :host do
       channel: 1
     ],
     control: [
-      too_loud: 0.8,
+      too_loud: 0.5,
       too_quiet: 0.1,
       oscillation_threshold: 6
     ],
@@ -79,7 +79,7 @@ else
       channel: 1
     ],
     control: [
-      too_loud: 0.8,
+      too_loud: 0.5,
       too_quiet: 0.1,
       oscillation_threshold: 6
     ],

@@ -13,13 +13,13 @@ defmodule HendrixHomeostat.RuntimeConfigTest do
   test "initializes with defaults from application config" do
     config = RuntimeConfig.get()
 
-    assert config.too_loud == 0.8
+    assert config.too_loud == 0.5
     assert config.too_quiet == 0.1
     assert config.oscillation_threshold == 6
   end
 
   test "get/1 returns specific configuration value" do
-    assert RuntimeConfig.get(:too_loud) == 0.8
+    assert RuntimeConfig.get(:too_loud) == 0.5
     assert RuntimeConfig.get(:too_quiet) == 0.1
     assert RuntimeConfig.get(:oscillation_threshold) == 6
   end
@@ -43,6 +43,6 @@ defmodule HendrixHomeostat.RuntimeConfigTest do
     RuntimeConfig.set(:too_loud, 0.9)
     RuntimeConfig.reset()
 
-    assert RuntimeConfig.get(:too_loud) == 0.8
+    assert RuntimeConfig.get(:too_loud) == 0.5
   end
 end

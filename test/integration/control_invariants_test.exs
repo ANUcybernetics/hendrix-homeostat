@@ -89,9 +89,9 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
+      send(control_pid, {:metrics, %{rms: 0.2, zcr: 0.5, peak: 0.2}})
       send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      send(control_pid, {:metrics, %{rms: 0.5, zcr: 0.5, peak: 0.5}})
-      send(control_pid, {:metrics, %{rms: 0.4, zcr: 0.5, peak: 0.4}})
+      send(control_pid, {:metrics, %{rms: 0.25, zcr: 0.5, peak: 0.25}})
       Process.sleep(50)
 
       history = InMemory.get_history()
@@ -271,9 +271,9 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       InMemory.clear_history()
 
-      # Send many samples in the ok zone
+      # Send many samples in the ok zone (between too_quiet and too_loud)
       for _ <- 1..20 do
-        send(control_pid, {:metrics, %{rms: 0.5, zcr: 0.5, peak: 0.5}})
+        send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
         Process.sleep(5)
       end
 
