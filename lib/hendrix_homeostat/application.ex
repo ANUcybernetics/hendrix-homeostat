@@ -12,6 +12,8 @@ defmodule HendrixHomeostat.Application do
       HendrixHomeostatWeb.Telemetry,
       {Phoenix.PubSub, name: HendrixHomeostat.PubSub},
       HendrixHomeostatWeb.Endpoint,
+      # Runtime configuration (must start before ControlLoop)
+      {HendrixHomeostat.RuntimeConfig, []},
       # Nerves components
       {HendrixHomeostat.MidiController, []},
       {HendrixHomeostat.AudioMonitor, []},

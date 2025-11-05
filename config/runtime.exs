@@ -41,7 +41,8 @@ if target == :host do
       stability_duration: 30_000,
       ultrastable_oscillation_threshold: 10,
       ultrastable_min_duration: 60_000,
-      stuck_track_threshold: 5
+      stuck_track_threshold: 5,
+      min_action_interval: 2000
     ],
     rc600_cc_map: [
       track1_rec_play: 1,
@@ -92,7 +93,9 @@ else
       stability_threshold: 0.02,
       stability_duration: 30_000,
       ultrastable_oscillation_threshold: 10,
-      ultrastable_min_duration: 60_000
+      ultrastable_min_duration: 60_000,
+      stuck_track_threshold: 5,
+      min_action_interval: 2000
     ],
     rc600_cc_map: [
       track1_rec_play: 1,

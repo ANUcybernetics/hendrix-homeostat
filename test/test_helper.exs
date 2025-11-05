@@ -52,9 +52,16 @@ target = System.get_env("MIX_TARGET", "host")
 # Tests will start supervised processes as needed
 Application.stop(:hendrix_homeostat)
 
-# Start PubSub for all tests (Phoenix-style)
-# This allows ControlLoop to broadcast state updates even in unit tests
-{:ok, _} = Supervisor.start_link([{Phoenix.PubSub, name: HendrixHomeostat.PubSub}], strategy: :one_for_one)
+# Start PubSub and RuntimeConfig for all tests
+# This allows ControlLoop to broadcast state updates and access runtime config even in unit tests
+{:ok, _} =
+  Supervisor.start_link(
+    [
+      {Phoenix.PubSub, name: HendrixHomeostat.PubSub},
+      {HendrixHomeostat.RuntimeConfig, []}
+    ],
+    strategy: :one_for_one
+  )
 
 # Configure ExUnit based on target
 exclude_tags =

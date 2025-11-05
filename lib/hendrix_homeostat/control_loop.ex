@@ -67,20 +67,8 @@ defmodule HendrixHomeostat.ControlLoop do
 
   @impl true
   def init(_opts) do
-    control_config = Application.fetch_env!(:hendrix_homeostat, :control)
-
-    config = %{
-      critical_high: Keyword.fetch!(control_config, :critical_high),
-      comfort_zone_min: Keyword.fetch!(control_config, :comfort_zone_min),
-      comfort_zone_max: Keyword.fetch!(control_config, :comfort_zone_max),
-      critical_low: Keyword.fetch!(control_config, :critical_low),
-      stability_threshold: Keyword.fetch!(control_config, :stability_threshold),
-      stability_duration: Keyword.fetch!(control_config, :stability_duration),
-      ultrastable_oscillation_threshold:
-        Keyword.get(control_config, :ultrastable_oscillation_threshold, 10),
-      ultrastable_min_duration: Keyword.get(control_config, :ultrastable_min_duration, 60_000),
-      stuck_track_threshold: Keyword.get(control_config, :stuck_track_threshold, 5)
-    }
+    # Get initial config from RuntimeConfig
+    config = HendrixHomeostat.RuntimeConfig.get()
 
     state = %{
       current_metrics: nil,
@@ -109,6 +97,12 @@ defmodule HendrixHomeostat.ControlLoop do
       |> broadcast_state()
 
     {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_info({:config_update, new_config}, state) do
+    Logger.info("ControlLoop received config update: #{inspect(new_config)}")
+    {:noreply, %{state | config: new_config}}
   end
 
   defp broadcast_state(state) do
@@ -151,9 +145,13 @@ defmodule HendrixHomeostat.ControlLoop do
       rms = state.current_metrics.rms
 
       cond do
-        # Critical high: too loud, dampen immediately
+        # Critical high: too loud, dampen immediately (bypass debounce for emergencies)
         rms >= state.config.critical_high ->
           handle_critical_high(state)
+
+        # For non-critical actions, respect minimum action interval
+        time_since_last_action(state) < state.config.min_action_interval ->
+          state
 
         # Below comfort zone: too quiet (including silence), excite
         # This actively seeks the comfort zone rather than waiting for critical_low
@@ -172,6 +170,12 @@ defmodule HendrixHomeostat.ControlLoop do
           state
       end
     end
+  end
+
+  defp time_since_last_action(%{last_action_timestamp: nil}), do: :infinity
+
+  defp time_since_last_action(state) do
+    System.monotonic_time(:millisecond) - state.last_action_timestamp
   end
 
   # Second-order ultrastable control
