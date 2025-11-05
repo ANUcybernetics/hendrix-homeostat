@@ -27,3 +27,6 @@ test/fixtures/
 # Build logs
 *.log
 firmware-build.log
+
+# Tailscale auth key (keep secret, don't commit)
+rootfs_overlay/etc/default/tailscale-up

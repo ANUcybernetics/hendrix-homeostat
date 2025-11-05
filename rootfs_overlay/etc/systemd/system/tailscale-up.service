@@ -1,0 +1,13 @@
+[Unit]
+Description=Tailscale auto-connect
+After=tailscaled.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'if [ -n "$TAILSCALE_AUTH_KEY" ]; then /usr/bin/tailscale up --authkey="$TAILSCALE_AUTH_KEY" --hostname=jimi --accept-routes; else echo "TAILSCALE_AUTH_KEY not set, skipping auto-join"; fi'
+RemainAfterExit=yes
+EnvironmentFile=-/etc/default/tailscale-up
+
+[Install]
+WantedBy=multi-user.target
