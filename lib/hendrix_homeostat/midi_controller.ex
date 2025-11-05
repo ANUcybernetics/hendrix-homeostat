@@ -35,7 +35,7 @@ defmodule HendrixHomeostat.MidiController do
     send_control_change(cc, 127)
   end
 
-  def clear_track(track_number) when track_number >= 1 and track_number <= 4 do
+  def clear_track(track_number) when track_number >= 1 and track_number <= 6 do
     cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
     cc = get_track_cc(cc_map, track_number, :clear)
     send_control_change(cc, 127)
@@ -46,6 +46,10 @@ defmodule HendrixHomeostat.MidiController do
     cc_map = Application.fetch_env!(:hendrix_homeostat, :rc600_cc_map)
     cc = get_track_cc(cc_map, track_number, :volume)
     send_control_change(cc, value)
+  end
+
+  def clear_all_tracks do
+    Enum.each(1..6, &clear_track/1)
   end
 
   defp get_track_cc(cc_map, track_number, action) do
@@ -69,7 +73,16 @@ defmodule HendrixHomeostat.MidiController do
       last_command: nil
     }
 
-    {:ok, state}
+    {:ok, state, {:continue, :clear_tracks}}
+  end
+
+  @impl true
+  def handle_continue(:clear_tracks, state) do
+    # Give the RC-600 a moment to be ready after system startup
+    Process.sleep(1000)
+    Logger.info("Clearing all RC-600 tracks on startup")
+    clear_all_tracks()
+    {:noreply, state}
   end
 
   @impl true
