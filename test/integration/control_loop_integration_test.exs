@@ -9,8 +9,10 @@ defmodule HendrixHomeostat.Integration.ControlLoopIntegrationTest do
     {:ok, _spy_pid} = start_supervised({TestSpy, []})
     TestSpy.set_notify(self())
 
-    {:ok, midi_pid} = start_supervised({MidiController, ready_notify: self()})
-    assert_receive {:midi_ready, ^midi_pid}, 1_500
+    {:ok, midi_pid} =
+      start_supervised({MidiController, ready_notify: self(), startup_delay_ms: 0})
+
+    assert_receive {:midi_ready, ^midi_pid}, 100
 
     _ = :sys.get_state(MidiController)
     drain_midi_events()

@@ -1,5 +1,5 @@
 defmodule HendrixHomeostatTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   doctest HendrixHomeostat
 
   test "greets the world" do

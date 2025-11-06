@@ -1,5 +1,5 @@
 defmodule HendrixHomeostat.AudioMonitorTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias HendrixHomeostat.AudioMonitor
 

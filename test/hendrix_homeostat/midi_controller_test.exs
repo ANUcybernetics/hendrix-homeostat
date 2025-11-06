@@ -1,5 +1,5 @@
 defmodule HendrixHomeostat.MidiControllerTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias HendrixHomeostat.MidiController
 
@@ -7,8 +7,10 @@ defmodule HendrixHomeostat.MidiControllerTest do
     @describetag :target_only
 
     setup do
-      {:ok, midi_pid} = start_supervised({MidiController, ready_notify: self()})
-      assert_receive {:midi_ready, ^midi_pid}, 1_500
+      {:ok, midi_pid} =
+        start_supervised({MidiController, ready_notify: self(), startup_delay_ms: 0})
+
+      assert_receive {:midi_ready, ^midi_pid}, 100
 
       :ok
     end
@@ -29,16 +31,16 @@ defmodule HendrixHomeostat.MidiControllerTest do
 
     test "send_program_change/1 updates state" do
       MidiController.send_program_change(5)
-      Process.sleep(50)
 
+      # GenServer calls are synchronous, so state should be updated immediately
       state = :sys.get_state(MidiController)
       assert state.last_command == {:program_change, 5}
     end
 
     test "send_control_change/2 updates state" do
       MidiController.send_control_change(10, 64)
-      Process.sleep(50)
 
+      # GenServer calls are synchronous, so state should be updated immediately
       state = :sys.get_state(MidiController)
       assert state.last_command == {:control_change, 10, 64}
     end

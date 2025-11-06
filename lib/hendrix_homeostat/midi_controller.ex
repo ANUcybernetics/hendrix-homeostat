@@ -67,13 +67,15 @@ defmodule HendrixHomeostat.MidiController do
     device_name = Keyword.fetch!(midi_config, :device_name)
     channel = Keyword.fetch!(midi_config, :channel)
     ready_notify = Keyword.get(opts, :ready_notify)
+    startup_delay_ms = Keyword.get(opts, :startup_delay_ms, 1000)
 
     state = %{
       midi: midi_module,
       device: device_name,
       channel: channel,
       last_command: nil,
-      ready_notify: ready_notify
+      ready_notify: ready_notify,
+      startup_delay_ms: startup_delay_ms
     }
 
     {:ok, state, {:continue, :clear_tracks}}
@@ -82,7 +84,7 @@ defmodule HendrixHomeostat.MidiController do
   @impl true
   def handle_continue(:clear_tracks, state) do
     # Give the RC-600 a moment to be ready after system startup
-    Process.sleep(1000)
+    Process.sleep(state.startup_delay_ms)
     Logger.info("Clearing all RC-600 tracks on startup")
     clear_all_tracks()
 

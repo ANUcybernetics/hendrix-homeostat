@@ -1,5 +1,5 @@
 defmodule HendrixHomeostat.AudioBackend.FileTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias HendrixHomeostat.AudioBackend.File, as: FileBackend
 
