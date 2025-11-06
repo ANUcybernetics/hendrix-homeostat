@@ -4,13 +4,13 @@
 #
 # 1. Host testing (default, recommended)
 #    - Tests run on development machine using test backends
-#    - Uses MidiBackend.InMemory and AudioBackend.File
+#    - Uses Midi.TestSpy and AudioBackend.File
 #    - Does not require hardware or libmnl-dev dependency
 #    - Run with: mix test
 #
 # 2. Target testing (hardware only)
 #    - Tests run on actual Raspberry Pi 5 hardware
-#    - Uses MidiBackend.Amidi and AudioBackend.Port
+#    - Uses Midi.Amidi and AudioBackend.Port
 #    - Requires real hardware and all dependencies
 #    - Run with: MIX_TARGET=rpi5 mix test --only target_only
 #
@@ -44,6 +44,7 @@
 
 # Compile test support files
 Code.require_file("support/conn_case.ex", __DIR__)
+Code.require_file("support/control_loop_helpers.ex", __DIR__)
 
 # Detect if we're running on host or target
 target = System.get_env("MIX_TARGET", "host")

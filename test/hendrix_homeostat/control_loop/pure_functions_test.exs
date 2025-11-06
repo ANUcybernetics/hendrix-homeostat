@@ -214,4 +214,128 @@ defmodule HendrixHomeostat.ControlLoop.PureFunctionsTest do
       assert length(unique_volumes) >= 3
     end
   end
+
+  describe "action_for_state/1" do
+    test "returns stop_track action for too_loud" do
+      action = ControlLoop.action_for_state(:too_loud)
+      assert match?({:stop_track, track} when track in 1..2, action)
+    end
+
+    test "returns start_recording action for too_quiet" do
+      action = ControlLoop.action_for_state(:too_quiet)
+      assert match?({:start_recording, track} when track in 1..2, action)
+    end
+
+    test "returns nil for ok state" do
+      assert ControlLoop.action_for_state(:ok) == nil
+    end
+  end
+
+  describe "plan_actions/4" do
+    setup do
+      config = %{too_loud: 0.8, too_quiet: 0.1, oscillation_threshold: 6}
+      {:ok, config: config}
+    end
+
+    test "plans transition and action when entering too_loud from nil", %{config: config} do
+      plan = ControlLoop.plan_actions(0.9, nil, [], config)
+
+      assert plan.new_state == :too_loud
+      assert match?({:stop_track, _}, plan.action)
+      assert plan.record_transition == true
+      assert plan.ultrastable_reconfig == false
+    end
+
+    test "plans transition and action when entering too_quiet from nil", %{config: config} do
+      plan = ControlLoop.plan_actions(0.05, nil, [], config)
+
+      assert plan.new_state == :too_quiet
+      assert match?({:start_recording, _}, plan.action)
+      assert plan.record_transition == true
+      assert plan.ultrastable_reconfig == false
+    end
+
+    test "plans transition from too_loud to too_quiet", %{config: config} do
+      plan = ControlLoop.plan_actions(0.05, :too_loud, [{:too_loud, 100}], config)
+
+      assert plan.new_state == :too_quiet
+      assert match?({:start_recording, _}, plan.action)
+      assert plan.record_transition == true
+      assert plan.ultrastable_reconfig == false
+    end
+
+    test "plans transition from too_quiet to too_loud", %{config: config} do
+      plan = ControlLoop.plan_actions(0.9, :too_quiet, [{:too_quiet, 100}], config)
+
+      assert plan.new_state == :too_loud
+      assert match?({:stop_track, _}, plan.action)
+      assert plan.record_transition == true
+      assert plan.ultrastable_reconfig == false
+    end
+
+    test "plans no transition when staying in same extreme state", %{config: config} do
+      plan = ControlLoop.plan_actions(0.95, :too_loud, [{:too_loud, 100}], config)
+
+      assert plan.new_state == :too_loud
+      assert match?({:stop_track, _}, plan.action)
+      assert plan.record_transition == false
+      assert plan.ultrastable_reconfig == false
+    end
+
+    test "plans no action when entering ok state", %{config: config} do
+      plan = ControlLoop.plan_actions(0.5, :too_loud, [{:too_loud, 100}], config)
+
+      assert plan.new_state == :ok
+      assert plan.action == nil
+      assert plan.record_transition == false
+      assert plan.ultrastable_reconfig == false
+    end
+
+    test "plans ultrastable reconfig when oscillating", %{config: config} do
+      history = [
+        {:too_quiet, 130},
+        {:too_loud, 120},
+        {:too_quiet, 110},
+        {:too_loud, 100},
+        {:too_quiet, 90},
+        {:too_loud, 80}
+      ]
+
+      plan = ControlLoop.plan_actions(0.9, :too_quiet, history, config)
+
+      assert plan.new_state == :too_loud
+      assert match?({:stop_track, _}, plan.action)
+      assert plan.record_transition == true
+      assert plan.ultrastable_reconfig == true
+    end
+
+    test "does not plan reconfig when not oscillating", %{config: config} do
+      history = [
+        {:too_loud, 100},
+        {:too_quiet, 90}
+      ]
+
+      plan = ControlLoop.plan_actions(0.9, :too_quiet, history, config)
+
+      assert plan.new_state == :too_loud
+      assert plan.ultrastable_reconfig == false
+    end
+
+    test "works with different config thresholds" do
+      custom_config = %{too_loud: 0.9, too_quiet: 0.05, oscillation_threshold: 3}
+
+      plan = ControlLoop.plan_actions(0.95, nil, [], custom_config)
+
+      assert plan.new_state == :too_loud
+      assert match?({:stop_track, _}, plan.action)
+    end
+
+    test "plans action even when no transition in extreme state", %{config: config} do
+      plan = ControlLoop.plan_actions(0.9, :too_loud, [{:too_loud, 100}], config)
+
+      assert plan.new_state == :too_loud
+      assert match?({:stop_track, _}, plan.action)
+      assert plan.record_transition == false
+    end
+  end
 end

@@ -1,16 +1,22 @@
 defmodule HendrixHomeostat.ControlLoopTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
+
+  import HendrixHomeostat.ControlLoopHelpers
 
   alias HendrixHomeostat.ControlLoop
   alias HendrixHomeostat.MidiController
-  alias HendrixHomeostat.MidiBackend.InMemory
+  alias HendrixHomeostat.Midi.TestSpy
 
   setup do
-    {:ok, _pid} = start_supervised({InMemory, name: InMemory})
-    InMemory.clear_history()
-
+    {:ok, _pid} = start_supervised({TestSpy, []})
     {:ok, _pid} = start_supervised(MidiController)
     {:ok, _pid} = start_supervised(ControlLoop)
+
+    # Wait for MidiController's handle_continue to complete
+    Process.sleep(1100)
+    TestSpy.clear_history()
+
+    subscribe_to_control_loop()
 
     :ok
   end
@@ -41,34 +47,34 @@ defmodule HendrixHomeostat.ControlLoopTest do
   end
 
   describe "receiving metrics" do
-    test "updates current_rms" do
-      metrics = %{rms: 0.5, zcr: 0.5, peak: 0.6}
+    test "broadcasts state with updated current_rms" do
+      send_metrics(0.5)
 
-      send(ControlLoop, {:metrics, metrics})
-      Process.sleep(20)
-
-      state = :sys.get_state(ControlLoop)
+      state = assert_state_broadcast()
       assert state.current_rms == 0.5
     end
 
     test "handles multiple metric updates" do
-      metrics1 = %{rms: 0.3, zcr: 0.5, peak: 0.6}
-      metrics2 = %{rms: 0.5, zcr: 0.55, peak: 0.65}
-      metrics3 = %{rms: 0.7, zcr: 0.6, peak: 0.7}
+      send_metrics(0.3)
+      send_metrics(0.5)
+      send_metrics(0.7)
 
-      send(ControlLoop, {:metrics, metrics1})
-      send(ControlLoop, {:metrics, metrics2})
-      send(ControlLoop, {:metrics, metrics3})
-      Process.sleep(50)
+      # Consume first two broadcasts
+      assert_state_broadcast()
+      assert_state_broadcast()
 
-      state = :sys.get_state(ControlLoop)
+      # Check the final state
+      state = assert_state_broadcast()
       assert state.current_rms == 0.7
     end
   end
 
   describe "configuration" do
     test "loads config from RuntimeConfig on init" do
-      state = :sys.get_state(ControlLoop)
+      # Trigger a state broadcast by sending metrics
+      send_metrics(0.5)
+
+      state = assert_state_broadcast()
 
       assert is_map(state.config)
       assert Map.has_key?(state.config, :too_loud)
@@ -77,14 +83,19 @@ defmodule HendrixHomeostat.ControlLoopTest do
     end
 
     test "receives config updates" do
-      initial_state = :sys.get_state(ControlLoop)
+      # Get initial state
+      send_metrics(0.5)
+      initial_state = assert_state_broadcast()
       initial_config = initial_state.config
 
+      # Update config
       new_config = %{too_loud: 0.9, too_quiet: 0.05, oscillation_threshold: 8}
       send(ControlLoop, {:config_update, new_config})
-      Process.sleep(20)
 
-      updated_state = :sys.get_state(ControlLoop)
+      # Trigger a new broadcast to see updated config
+      send_metrics(0.6)
+      updated_state = assert_state_broadcast()
+
       assert updated_state.config != initial_config
       assert updated_state.config.too_loud == 0.9
       assert updated_state.config.too_quiet == 0.05
@@ -93,44 +104,30 @@ defmodule HendrixHomeostat.ControlLoopTest do
   end
 
   describe "state transitions" do
-    test "tracks transition from ok to too_loud" do
-      send(ControlLoop, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      Process.sleep(20)
-
-      initial_state = :sys.get_state(ControlLoop)
-      assert initial_state.last_state == nil
-
-      send(ControlLoop, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
-      Process.sleep(20)
-
-      final_state = :sys.get_state(ControlLoop)
-      assert final_state.last_state == :too_loud
-      assert length(final_state.transition_history) == 1
+    test "tracks transition from nil to too_loud" do
+      send_metrics(0.9)
+      state = assert_state_broadcast()
+      assert state.last_state == :too_loud
+      assert length(state.transition_history) == 1
     end
 
     test "tracks transition from ok to too_quiet" do
-      send(ControlLoop, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
-      Process.sleep(20)
+      send_metrics(0.3)
+      assert_state_broadcast()
 
-      send(ControlLoop, {:metrics, %{rms: 0.05, zcr: 0.5, peak: 0.05}})
-      Process.sleep(20)
-
-      state = :sys.get_state(ControlLoop)
+      send_metrics(0.05)
+      state = assert_state_broadcast()
       assert state.last_state == :too_quiet
       assert length(state.transition_history) == 1
     end
 
     test "does not record transition when staying in same state" do
-      send(ControlLoop, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
-      Process.sleep(20)
-
-      state1 = :sys.get_state(ControlLoop)
+      send_metrics(0.9)
+      state1 = assert_state_broadcast()
       history_length_1 = length(state1.transition_history)
 
-      send(ControlLoop, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
-      Process.sleep(20)
-
-      state2 = :sys.get_state(ControlLoop)
+      send_metrics(0.95)
+      state2 = assert_state_broadcast()
       history_length_2 = length(state2.transition_history)
 
       # Should not have added a new transition
@@ -143,22 +140,22 @@ defmodule HendrixHomeostat.ControlLoopTest do
       # Alternate between too_loud and too_quiet many times
       for i <- 1..50 do
         rms = if rem(i, 2) == 0, do: 0.9, else: 0.05
-        send(ControlLoop, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
-        Process.sleep(5)
+        send_metrics(rms)
       end
 
-      Process.sleep(50)
+      # Consume all broadcasts and check the final state
+      state =
+        Stream.repeatedly(fn -> assert_state_broadcast(timeout: 50) end)
+        |> Enum.take(50)
+        |> List.last()
 
-      state = :sys.get_state(ControlLoop)
       # Should be bounded to 20
       assert length(state.transition_history) <= 20
     end
 
     test "transition history contains timestamps" do
-      send(ControlLoop, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
-      Process.sleep(20)
-
-      state = :sys.get_state(ControlLoop)
+      send_metrics(0.9)
+      state = assert_state_broadcast()
 
       if length(state.transition_history) > 0 do
         [{_state, timestamp} | _] = state.transition_history
@@ -172,33 +169,36 @@ defmodule HendrixHomeostat.ControlLoopTest do
       # Create oscillation pattern
       for i <- 1..20 do
         rms = if rem(i, 2) == 0, do: 0.9, else: 0.05
-        send(ControlLoop, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
-        Process.sleep(10)
+        send_metrics(rms)
       end
 
-      Process.sleep(100)
+      # Collect all state broadcasts
+      states =
+        Stream.repeatedly(fn -> assert_state_broadcast(timeout: 100) end)
+        |> Enum.take(20)
 
-      state = :sys.get_state(ControlLoop)
+      # Find the last state (after potential reconfiguration)
+      final_state = List.last(states)
 
       # After ultrastable reconfiguration, history should be cleared
       # or significantly reduced
-      assert length(state.transition_history) < 10
+      assert length(final_state.transition_history) < 10
     end
 
     test "updates track volumes after ultrastable reconfiguration" do
       # Create oscillation pattern to trigger reconfiguration
       for i <- 1..20 do
         rms = if rem(i, 2) == 0, do: 0.9, else: 0.05
-        send(ControlLoop, {:metrics, %{rms: rms, zcr: 0.5, peak: rms}})
-        Process.sleep(10)
+        send_metrics(rms)
       end
 
-      Process.sleep(100)
+      # Collect state broadcasts and check final state
+      final_state =
+        Stream.repeatedly(fn -> assert_state_broadcast(timeout: 100) end)
+        |> Enum.take(20)
+        |> List.last()
 
-      final_state = :sys.get_state(ControlLoop)
-
-      # Volumes should have changed (probabilistically - might be same by chance)
-      # At least check they're valid MIDI values
+      # Volumes should be valid MIDI values
       assert final_state.track1_volume in [25, 50, 75, 100, 127]
       assert final_state.track2_volume in [25, 50, 75, 100, 127]
     end

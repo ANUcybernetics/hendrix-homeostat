@@ -155,11 +155,11 @@ defmodule HendrixHomeostat.Application do
       raise "backends configuration must be a keyword list"
     end
 
-    midi_backend = Keyword.fetch!(backends, :midi_backend)
+    midi = Keyword.fetch!(backends, :midi)
     audio_backend = Keyword.fetch!(backends, :audio_backend)
 
-    unless is_atom(midi_backend) do
-      raise "backends.midi_backend must be a module name (atom)"
+    unless is_atom(midi) do
+      raise "backends.midi must be a module name (atom)"
     end
 
     unless is_atom(audio_backend) do

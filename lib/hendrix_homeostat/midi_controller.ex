@@ -60,14 +60,14 @@ defmodule HendrixHomeostat.MidiController do
   @impl true
   def init(_opts) do
     backends = Application.fetch_env!(:hendrix_homeostat, :backends)
-    backend_module = Keyword.fetch!(backends, :midi_backend)
+    midi_module = Keyword.fetch!(backends, :midi)
 
     midi_config = Application.fetch_env!(:hendrix_homeostat, :midi)
     device_name = Keyword.fetch!(midi_config, :device_name)
     channel = Keyword.fetch!(midi_config, :channel)
 
     state = %{
-      backend: backend_module,
+      midi: midi_module,
       device: device_name,
       channel: channel,
       last_command: nil
@@ -87,7 +87,7 @@ defmodule HendrixHomeostat.MidiController do
 
   @impl true
   def handle_cast({:send_program_change, memory_number}, state) do
-    result = state.backend.send_program_change(state.device, memory_number)
+    result = state.midi.send_program_change(state.device, memory_number)
 
     case result do
       :ok ->
@@ -102,7 +102,7 @@ defmodule HendrixHomeostat.MidiController do
 
   @impl true
   def handle_cast({:send_control_change, cc_number, value}, state) do
-    result = state.backend.send_control_change(state.device, cc_number, value)
+    result = state.midi.send_control_change(state.device, cc_number, value)
 
     case result do
       :ok ->

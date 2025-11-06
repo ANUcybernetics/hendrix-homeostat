@@ -15,6 +15,9 @@ target =
     end
   end
 
+# Detect if we're in test environment
+env = config_env()
+
 config :hendrix_homeostat,
   target: target
 
@@ -59,7 +62,7 @@ if target == :host do
       track4_clear: 20
     ],
     backends: [
-      midi_backend: HendrixHomeostat.MidiBackend.InMemory,
+      midi: (if env == :test, do: HendrixHomeostat.Midi.TestSpy, else: HendrixHomeostat.Midi.Fake),
       audio_backend: HendrixHomeostat.AudioBackend.File
     ]
 else
@@ -105,7 +108,7 @@ else
       track4_clear: 20
     ],
     backends: [
-      midi_backend: HendrixHomeostat.MidiBackend.Amidi,
+      midi: HendrixHomeostat.Midi.Amidi,
       audio_backend: HendrixHomeostat.AudioBackend.Port
     ],
     tailscale_auth_key: System.get_env("TAILSCALE_AUTH_KEY"),

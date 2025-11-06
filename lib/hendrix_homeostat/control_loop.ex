@@ -202,6 +202,84 @@ defmodule HendrixHomeostat.ControlLoop do
     Enum.random([25, 50, 75, 100, 127])
   end
 
+  @doc """
+  Plan what actions to take based on current RMS reading and history.
+
+  This is a pure function that makes all decisions without performing side effects.
+  Returns a plan structure describing what should be done.
+
+  ## Examples
+
+      iex> config = %{too_loud: 0.8, too_quiet: 0.1, oscillation_threshold: 6}
+      iex> plan = ControlLoop.plan_actions(0.9, nil, [], config)
+      iex> plan.new_state
+      :too_loud
+      iex> match?({:stop_track, _}, plan.action)
+      true
+      iex> plan.record_transition
+      true
+
+      iex> config = %{too_loud: 0.8, too_quiet: 0.1, oscillation_threshold: 6}
+      iex> plan = ControlLoop.plan_actions(0.5, :too_loud, [], config)
+      iex> plan.new_state
+      :ok
+      iex> plan.action
+      nil
+
+      iex> config = %{too_loud: 0.8, too_quiet: 0.1, oscillation_threshold: 6}
+      iex> history = [
+      ...>   {:too_quiet, 110}, {:too_loud, 100}, {:too_quiet, 90},
+      ...>   {:too_loud, 80}, {:too_quiet, 70}, {:too_loud, 60}
+      ...> ]
+      iex> plan = ControlLoop.plan_actions(0.9, :too_quiet, history, config)
+      iex> plan.ultrastable_reconfig
+      true
+  """
+  def plan_actions(current_rms, last_state, transition_history, config) do
+    current_state = classify_state(current_rms, config)
+
+    case detect_transition(last_state, current_state) do
+      {:transition, new_state} ->
+        new_history = [{new_state, 0} | transition_history]
+        needs_reconfig = oscillating?(new_history, config)
+
+        %{
+          action: action_for_state(new_state),
+          new_state: new_state,
+          record_transition: true,
+          ultrastable_reconfig: needs_reconfig
+        }
+
+      {:no_transition, state} ->
+        action = if state in [:too_quiet, :too_loud], do: action_for_state(state), else: nil
+
+        %{
+          action: action,
+          new_state: state,
+          record_transition: false,
+          ultrastable_reconfig: false
+        }
+    end
+  end
+
+  @doc """
+  Determine what action should be taken for a given state.
+
+  ## Examples
+
+      iex> match?({:stop_track, track} when track in 1..2, ControlLoop.action_for_state(:too_loud))
+      true
+
+      iex> match?({:start_recording, track} when track in 1..2, ControlLoop.action_for_state(:too_quiet))
+      true
+
+      iex> ControlLoop.action_for_state(:ok)
+      nil
+  """
+  def action_for_state(:too_loud), do: {:stop_track, Enum.random(1..2)}
+  def action_for_state(:too_quiet), do: {:start_recording, Enum.random(1..2)}
+  def action_for_state(:ok), do: nil
+
   # ============================================================================
   # Effectful actions (state updates + MIDI commands)
   # ============================================================================
@@ -209,29 +287,20 @@ defmodule HendrixHomeostat.ControlLoop do
   defp evaluate_and_act(%State{current_rms: nil} = state), do: state
 
   defp evaluate_and_act(state) do
-    current_state = classify_state(state.current_rms, state.config)
+    plan = plan_actions(state.current_rms, state.last_state, state.transition_history, state.config)
 
-    case detect_transition(state.last_state, current_state) do
-      {:transition, new_state} ->
-        state
-        |> record_transition(new_state)
-        |> maybe_trigger_ultrastable_reconfiguration()
-        |> take_action(new_state)
-        |> Map.put(:last_state, new_state)
-
-      {:no_transition, _} ->
-        # No transition, but still take action if in extreme state
-        if current_state in [:too_quiet, :too_loud] do
-          take_action(state, current_state)
-        else
-          state
-        end
-    end
+    state
+    |> maybe_record_transition(plan)
+    |> maybe_ultrastable_reconfig(plan)
+    |> execute_action(plan)
+    |> Map.put(:last_state, plan.new_state)
   end
 
-  defp record_transition(state, new_extreme_state) do
+  defp maybe_record_transition(state, %{record_transition: false}), do: state
+
+  defp maybe_record_transition(state, %{record_transition: true, new_state: new_state}) do
     timestamp = System.monotonic_time(:millisecond)
-    new_transition = {new_extreme_state, timestamp}
+    new_transition = {new_state, timestamp}
 
     new_history =
       [new_transition | state.transition_history]
@@ -240,15 +309,9 @@ defmodule HendrixHomeostat.ControlLoop do
     %{state | transition_history: new_history}
   end
 
-  defp maybe_trigger_ultrastable_reconfiguration(state) do
-    if oscillating?(state.transition_history, state.config) do
-      trigger_ultrastable_reconfiguration(state)
-    else
-      state
-    end
-  end
+  defp maybe_ultrastable_reconfig(state, %{ultrastable_reconfig: false}), do: state
 
-  defp trigger_ultrastable_reconfiguration(state) do
+  defp maybe_ultrastable_reconfig(state, %{ultrastable_reconfig: true}) do
     Logger.info("Ultrastable reconfiguration triggered - system oscillating, changing parameters")
 
     new_track1_volume = random_volume()
@@ -269,16 +332,15 @@ defmodule HendrixHomeostat.ControlLoop do
     }
   end
 
-  defp take_action(state, :too_loud) do
-    track = Enum.random(1..2)
+  defp execute_action(state, %{action: nil}), do: state
+
+  defp execute_action(state, %{action: {:stop_track, track}}) do
     Logger.debug("Too loud (RMS: #{Float.round(state.current_rms, 3)}), stopping track #{track}")
     HendrixHomeostat.MidiController.stop_track(track)
     state
   end
 
-  defp take_action(state, :too_quiet) do
-    track = Enum.random(1..2)
-
+  defp execute_action(state, %{action: {:start_recording, track}}) do
     Logger.debug(
       "Too quiet (RMS: #{Float.round(state.current_rms, 3)}), starting recording on track #{track}"
     )
@@ -286,8 +348,6 @@ defmodule HendrixHomeostat.ControlLoop do
     HendrixHomeostat.MidiController.start_recording(track)
     state
   end
-
-  defp take_action(state, :ok), do: state
 
   defp broadcast_state(state) do
     # Broadcast state for LiveView updates if PubSub is available

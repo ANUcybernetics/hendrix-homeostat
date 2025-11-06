@@ -3,7 +3,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
   alias HendrixHomeostat.ControlLoop
   alias HendrixHomeostat.MidiController
-  alias HendrixHomeostat.MidiBackend.InMemory
+  alias HendrixHomeostat.Midi.TestSpy
 
   @moduledoc """
   Integration tests for core system invariants.
@@ -17,10 +17,12 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
   """
 
   setup do
-    {:ok, _in_memory_pid} = start_supervised({InMemory, name: InMemory})
-    InMemory.clear_history()
-
+    {:ok, _spy_pid} = start_supervised({TestSpy, []})
     {:ok, _midi_pid} = start_supervised(MidiController)
+
+    # Wait for MidiController's handle_continue to complete
+    Process.sleep(1100)
+    TestSpy.clear_history()
 
     :ok
   end
@@ -29,37 +31,37 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "control loop responds to extreme high metrics" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
       Process.sleep(50)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
       assert length(history) > 0, "Control loop should respond to extreme high metrics"
     end
 
     test "control loop responds to extreme low metrics" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.05, zcr: 0.5, peak: 0.05}})
       Process.sleep(50)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
       assert length(history) > 0, "Control loop should respond to extreme low metrics"
     end
 
     test "control loop sends valid MIDI messages" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
       send(control_pid, {:metrics, %{rms: 0.01, zcr: 0.5, peak: 0.01}})
       Process.sleep(100)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       Enum.each(history, fn
         {:control_change, _device, cc, value, _timestamp} ->
@@ -87,14 +89,14 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "ok zone metrics do not trigger immediate actions" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.2, zcr: 0.5, peak: 0.2}})
       send(control_pid, {:metrics, %{rms: 0.3, zcr: 0.5, peak: 0.3}})
       send(control_pid, {:metrics, %{rms: 0.25, zcr: 0.5, peak: 0.25}})
       Process.sleep(50)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       assert length(history) == 0,
              "Ok zone metrics should not trigger actions"
@@ -113,12 +115,12 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "control loop can send MIDI commands via controller" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
       Process.sleep(50)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       if length(history) > 0 do
         assert Enum.all?(history, fn msg ->
@@ -149,7 +151,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "repeated oscillation triggers ultrastable reconfiguration" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       # Create sustained oscillation pattern
       for i <- 1..20 do
@@ -160,7 +162,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       Process.sleep(100)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       # Should have sent volume change commands during ultrastable reconfiguration
       volume_changes =
@@ -180,7 +182,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "non-oscillating behavior does not trigger reconfiguration" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       # Send just a few extremes, not enough to be considered oscillating
       send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
@@ -190,7 +192,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
       send(control_pid, {:metrics, %{rms: 0.9, zcr: 0.5, peak: 0.9}})
       Process.sleep(50)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       # Should have track control messages but no volume changes
       volume_changes =
@@ -208,12 +210,12 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "all control change messages have device, cc, value, timestamp" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       send(control_pid, {:metrics, %{rms: 0.95, zcr: 0.5, peak: 0.95}})
       Process.sleep(50)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       control_changes = Enum.filter(history, &match?({:control_change, _, _, _, _}, &1))
 
@@ -228,7 +230,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "MIDI messages have monotonically increasing timestamps" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       for i <- 1..5 do
         rms = if rem(i, 2) == 0, do: 0.9, else: 0.05
@@ -236,7 +238,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
         Process.sleep(20)
       end
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       if length(history) >= 2 do
         timestamps = Enum.map(history, fn {:control_change, _, _, _, ts} -> ts end)
@@ -252,7 +254,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "gradual increase in level eventually triggers action" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       # Gradually increase RMS
       for i <- 1..10 do
@@ -261,7 +263,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
         Process.sleep(10)
       end
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       assert length(history) > 0, "Gradual increase should eventually trigger action"
     end
@@ -269,7 +271,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "stable ok zone maintains state without actions" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       # Send many samples in the ok zone (between too_quiet and too_loud)
       for _ <- 1..20 do
@@ -279,7 +281,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
 
       Process.sleep(50)
 
-      history = InMemory.get_history()
+      history = TestSpy.get_history()
 
       assert length(history) == 0, "Stable ok zone should not trigger actions"
     end
@@ -287,7 +289,7 @@ defmodule HendrixHomeostat.Integration.ControlInvariantsTest do
     test "alternating extremes creates oscillation" do
       {:ok, control_pid} = start_supervised(ControlLoop)
 
-      InMemory.clear_history()
+      TestSpy.clear_history()
 
       # Create clear oscillation pattern
       for i <- 1..15 do

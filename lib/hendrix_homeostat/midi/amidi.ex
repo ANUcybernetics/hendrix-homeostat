@@ -1,7 +1,19 @@
-defmodule HendrixHomeostat.MidiBackend.Amidi do
-  @behaviour HendrixHomeostat.MidiBackend
+defmodule HendrixHomeostat.Midi.Amidi do
+  @moduledoc """
+  MIDI implementation using the amidi command-line tool.
 
-  @impl true
+  This module shells out to the `amidi` command to send MIDI messages
+  to hardware devices.
+  """
+
+  @doc """
+  Send a program change message via amidi.
+
+  ## Examples
+
+      send_program_change("hw:1,0", 5)
+      #=> :ok
+  """
   def send_program_change(device, memory) do
     hex_message = "C0#{to_hex(memory)}"
 
@@ -11,7 +23,14 @@ defmodule HendrixHomeostat.MidiBackend.Amidi do
     end
   end
 
-  @impl true
+  @doc """
+  Send a control change message via amidi.
+
+  ## Examples
+
+      send_control_change("hw:1,0", 7, 127)
+      #=> :ok
+  """
   def send_control_change(device, cc, value) do
     hex_message = "B0#{to_hex(cc)}#{to_hex(value)}"
 
