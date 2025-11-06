@@ -16,28 +16,30 @@ defmodule HendrixHomeostatWeb.DashboardLiveTest do
       assert html =~ "Peak"
     end
 
-    test "displays control state section", %{conn: conn} do
+    test "displays control state information", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/")
       assert html =~ "Control State"
-      assert html =~ "Stability Attempts"
-      assert html =~ "Last Action"
+      assert html =~ "Last Classification"
+      assert html =~ "Transitions Tracked"
     end
 
-    test "displays track parameters section", %{conn: conn} do
+    test "displays track volumes", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/")
-      assert html =~ "Track Parameters (Ultrastability)"
-      assert html =~ "Track 1 (Experimental)"
-      assert html =~ "Track 2 (Anchor)"
+      assert html =~ "Track Volumes"
+      assert html =~ "Track 1"
+      assert html =~ "Track 2"
     end
 
     test "displays initial values", %{conn: conn} do
       {:ok, _view, html} = live(conn, "/")
       # Initial RMS should be 0.0
       assert html =~ "0.0"
-      # Initial stability attempts should be 0
+      # Initial transition count should be 0
       assert html =~ ">0</dd>"
       # Initial track volumes should be 75
       assert html =~ ">75</dd>"
+      # Initial classification should be Idle
+      assert html =~ "Idle"
     end
 
     test "updates when control state is broadcast", %{conn: conn} do
@@ -50,9 +52,10 @@ defmodule HendrixHomeostatWeb.DashboardLiveTest do
         {:control_state,
          %{
            current_metrics: %{rms: 0.456, zcr: 123.45, peak: 0.789},
-           track1_params: %{volume: 100},
-           track2_params: %{volume: 50},
-           stability_attempts: 3
+           transition_history: [{:too_loud, 123}],
+           last_state: :too_loud,
+           track1_volume: 100,
+           track2_volume: 50
          }}
       )
 
@@ -60,9 +63,10 @@ defmodule HendrixHomeostatWeb.DashboardLiveTest do
       assert render(view) =~ "0.456"
       assert render(view) =~ "123.45"
       assert render(view) =~ "0.789"
-      assert render(view) =~ ">3</dd>"
       assert render(view) =~ ">100</dd>"
       assert render(view) =~ ">50</dd>"
+      assert render(view) =~ "Too loud"
+      assert render(view) =~ ">1</dd>"
     end
   end
 end

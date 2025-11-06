@@ -32,6 +32,20 @@ defmodule HendrixHomeostat.AudioBackend.Port do
 
     channels = Map.get(config, :channels, 6)
     frame_size = bytes_per_sample * channels
+    remainder = rem(buffer_size, frame_size)
+
+    cond do
+      buffer_size <= 0 ->
+        raise ArgumentError, "audio.buffer_size must be a positive integer"
+
+      frame_size <= 0 ->
+        raise ArgumentError, "computed frame size must be positive"
+
+      remainder != 0 ->
+        raise ArgumentError,
+              "audio.buffer_size (#{buffer_size}) must be a multiple of frame size #{frame_size} for #{channels} channels in #{format}"
+    end
+
     num_frames = div(buffer_size, frame_size)
     actual_buffer_bytes = num_frames * frame_size
 

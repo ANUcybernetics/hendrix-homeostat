@@ -35,6 +35,7 @@ defmodule HendrixHomeostat.ControlLoop do
   defmodule State do
     @moduledoc false
     @type t :: %__MODULE__{
+            current_metrics: %{optional(atom()) => number()} | nil,
             current_rms: float() | nil,
             last_state: :too_quiet | :too_loud | :ok | nil,
             transition_history: list({:too_quiet | :too_loud, integer()}),
@@ -44,6 +45,7 @@ defmodule HendrixHomeostat.ControlLoop do
           }
 
     defstruct [
+      :current_metrics,
       :current_rms,
       :last_state,
       transition_history: [],
@@ -80,6 +82,7 @@ defmodule HendrixHomeostat.ControlLoop do
   def handle_info({:metrics, metrics}, state) do
     new_state =
       state
+      |> Map.put(:current_metrics, metrics)
       |> Map.put(:current_rms, metrics.rms)
       |> evaluate_and_act()
       |> broadcast_state()
@@ -287,7 +290,8 @@ defmodule HendrixHomeostat.ControlLoop do
   defp evaluate_and_act(%State{current_rms: nil} = state), do: state
 
   defp evaluate_and_act(state) do
-    plan = plan_actions(state.current_rms, state.last_state, state.transition_history, state.config)
+    plan =
+      plan_actions(state.current_rms, state.last_state, state.transition_history, state.config)
 
     state
     |> maybe_record_transition(plan)

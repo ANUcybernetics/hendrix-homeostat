@@ -110,24 +110,28 @@ defmodule HendrixHomeostat.RuntimeConfig do
 
   @impl true
   def handle_call({:set, key, value}, _from, state) do
-    new_state = Map.put(state, key, value)
-    Logger.info("RuntimeConfig updated: #{key} = #{inspect(value)}")
+    case apply_updates(state, %{key => value}) do
+      {:ok, new_state} ->
+        Logger.info("RuntimeConfig updated: #{key} = #{inspect(value)}")
+        notify_control_loop(new_state)
+        {:reply, :ok, new_state}
 
-    # Notify ControlLoop of config change
-    notify_control_loop(new_state)
-
-    {:reply, :ok, new_state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
   end
 
   @impl true
   def handle_call({:update, map}, _from, state) do
-    new_state = Map.merge(state, map)
-    Logger.info("RuntimeConfig updated: #{inspect(map)}")
+    case apply_updates(state, map) do
+      {:ok, new_state} ->
+        Logger.info("RuntimeConfig updated: #{inspect(Map.take(map, @config_keys))}")
+        notify_control_loop(new_state)
+        {:reply, :ok, new_state}
 
-    # Notify ControlLoop of config change
-    notify_control_loop(new_state)
-
-    {:reply, :ok, new_state}
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
+    end
   end
 
   @impl true
@@ -141,12 +145,67 @@ defmodule HendrixHomeostat.RuntimeConfig do
       defaults: control_config
     }
 
+    validate_config!(new_state)
     Logger.info("RuntimeConfig reset to defaults")
 
     # Notify ControlLoop of config change
     notify_control_loop(new_state)
 
     {:reply, :ok, new_state}
+  end
+
+  defp apply_updates(state, updates) when is_map(updates) do
+    allowed = Map.take(updates, @config_keys)
+
+    if map_size(allowed) == 0 do
+      {:error, :no_valid_keys}
+    else
+      new_state = Map.merge(state, allowed)
+
+      case validate_config(new_state) do
+        :ok -> {:ok, new_state}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp validate_config!(state) do
+    case validate_config(state) do
+      :ok -> :ok
+      {:error, reason} -> raise ArgumentError, reason
+    end
+  end
+
+  defp validate_config(state) do
+    with {:ok, too_loud} <- validate_threshold(:too_loud, Map.fetch!(state, :too_loud)),
+         {:ok, too_quiet} <- validate_threshold(:too_quiet, Map.fetch!(state, :too_quiet)),
+         :ok <- validate_oscillation_threshold(Map.fetch!(state, :oscillation_threshold)),
+         true <- too_quiet < too_loud do
+      :ok
+    else
+      false ->
+        {:error, "control.too_quiet must be less than control.too_loud"}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp validate_threshold(_name, value) when is_float(value) and value >= 0.0 and value <= 1.0 do
+    {:ok, value}
+  end
+
+  defp validate_threshold(name, _value) do
+    {:error, "control.#{name} must be a float between 0.0 and 1.0"}
+  end
+
+  defp validate_oscillation_threshold(value)
+       when is_integer(value) and value > 0 do
+    :ok
+  end
+
+  defp validate_oscillation_threshold(_value) do
+    {:error, "control.oscillation_threshold must be a positive integer"}
   end
 
   defp notify_control_loop(state) do
