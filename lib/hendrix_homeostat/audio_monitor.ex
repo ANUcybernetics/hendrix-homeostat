@@ -10,6 +10,8 @@ defmodule HendrixHomeostat.AudioMonitor do
     :control_loop_pid,
     :update_interval,
     :timer_ref,
+    :timer_module,
+    :metrics_notify,
     :last_metrics,
     :config,
     :format
@@ -17,18 +19,19 @@ defmodule HendrixHomeostat.AudioMonitor do
 
   def child_spec(opts) do
     %{
-      id: __MODULE__,
+      id: Keyword.get(opts, :name, __MODULE__),
       start: {__MODULE__, :start_link, [opts]},
       shutdown: 5_000
     }
   end
 
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: name)
   end
 
   @impl true
-  def init(_opts) do
+  def init(opts) do
     backends = Application.fetch_env!(:hendrix_homeostat, :backends)
     audio_config = Application.fetch_env!(:hendrix_homeostat, :audio)
 
@@ -36,6 +39,8 @@ defmodule HendrixHomeostat.AudioMonitor do
     update_rate = Keyword.fetch!(audio_config, :update_rate)
     buffer_size = Keyword.fetch!(audio_config, :buffer_size)
     format = Keyword.get(audio_config, :format, "S16_LE")
+    timer_module = Keyword.get(opts, :timer_module, :timer)
+    metrics_notify = Keyword.get(opts, :metrics_notify)
 
     backend_config =
       audio_config
@@ -45,7 +50,7 @@ defmodule HendrixHomeostat.AudioMonitor do
     case backend_module.start_link(backend_config) do
       {:ok, backend_pid} ->
         update_interval = div(1000, update_rate)
-        {:ok, timer_ref} = :timer.send_interval(update_interval, :read_audio)
+        {:ok, timer_ref} = timer_module.send_interval(update_interval, :read_audio)
 
         state = %__MODULE__{
           backend: backend_module,
@@ -53,6 +58,8 @@ defmodule HendrixHomeostat.AudioMonitor do
           control_loop_pid: HendrixHomeostat.ControlLoop,
           update_interval: update_interval,
           timer_ref: timer_ref,
+          timer_module: timer_module,
+          metrics_notify: metrics_notify,
           last_metrics: nil,
           format: format_to_atom(format),
           config: %{
@@ -84,6 +91,8 @@ defmodule HendrixHomeostat.AudioMonitor do
             send(pid, {:metrics, metrics})
         end
 
+        maybe_notify(metrics, state.metrics_notify)
+
         {:noreply, %{state | last_metrics: metrics}}
 
       {:error, reason} ->
@@ -95,7 +104,7 @@ defmodule HendrixHomeostat.AudioMonitor do
   @impl true
   def terminate(_reason, state) do
     if state.timer_ref do
-      :timer.cancel(state.timer_ref)
+      state.timer_module.cancel(state.timer_ref)
     end
 
     :ok
@@ -105,4 +114,10 @@ defmodule HendrixHomeostat.AudioMonitor do
   defp format_to_atom("S32_LE"), do: :s32
   defp format_to_atom(:s16), do: :s16
   defp format_to_atom(:s32), do: :s32
+
+  defp maybe_notify(_metrics, nil), do: :ok
+
+  defp maybe_notify(metrics, pid) do
+    send(pid, {:audio_metrics, metrics, self()})
+  end
 end

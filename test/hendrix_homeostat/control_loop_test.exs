@@ -9,12 +9,13 @@ defmodule HendrixHomeostat.ControlLoopTest do
 
   setup do
     {:ok, _pid} = start_supervised({TestSpy, []})
-    {:ok, _pid} = start_supervised(MidiController)
-    {:ok, _pid} = start_supervised(ControlLoop)
-
-    # Wait for MidiController's handle_continue to complete
-    Process.sleep(1100)
+    TestSpy.clear_notify()
+    {:ok, midi_pid} = start_supervised({MidiController, ready_notify: self()})
+    assert_receive {:midi_ready, ^midi_pid}, 1_500
+    _ = :sys.get_state(MidiController)
     TestSpy.clear_history()
+
+    {:ok, _pid} = start_supervised(ControlLoop)
 
     subscribe_to_control_loop()
 

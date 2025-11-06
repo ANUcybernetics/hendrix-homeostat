@@ -3,6 +3,39 @@ defmodule HendrixHomeostat.AudioMonitorTest do
 
   alias HendrixHomeostat.AudioMonitor
 
+  defmodule TestTimer do
+    def send_interval(_interval, message) do
+      caller = self()
+
+      pid =
+        spawn_link(fn ->
+          loop(caller, message)
+        end)
+
+      {:ok, pid}
+    end
+
+    def tick(timer_pid) do
+      send(timer_pid, :tick)
+    end
+
+    def cancel(timer_pid) do
+      send(timer_pid, :cancel)
+      :ok
+    end
+
+    defp loop(caller, message) do
+      receive do
+        :tick ->
+          send(caller, message)
+          loop(caller, message)
+
+        :cancel ->
+          :ok
+      end
+    end
+  end
+
   @test_data_dir Path.join([__DIR__, "..", "fixtures"])
 
   setup do
@@ -39,17 +72,23 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       end)
     end)
 
-    %{test_file: test_file}
+    %{test_file: test_file, timer_module: __MODULE__.TestTimer}
   end
 
   describe "GenServer lifecycle" do
-    test "starts successfully with file backend" do
-      {:ok, pid} = start_supervised(AudioMonitor)
+    test "starts successfully with file backend", %{timer_module: timer_module} do
+      {:ok, pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
       assert Process.alive?(pid)
     end
 
-    test "loads configuration from application environment" do
-      {:ok, pid} = start_supervised(AudioMonitor)
+    test "loads configuration from application environment", %{timer_module: timer_module} do
+      {:ok, pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
 
       state = :sys.get_state(pid)
       assert state.config.buffer_size == 4800
@@ -57,8 +96,11 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       assert state.config.update_rate == 10
     end
 
-    test "initializes backend and starts timer" do
-      {:ok, pid} = start_supervised(AudioMonitor)
+    test "initializes backend and starts timer", %{timer_module: timer_module} do
+      {:ok, pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
 
       state = :sys.get_state(pid)
       assert state.backend == HendrixHomeostat.AudioBackend.File
@@ -68,8 +110,11 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       assert state.update_interval == 100
     end
 
-    test "registers ControlLoop as destination for metrics" do
-      {:ok, pid} = start_supervised(AudioMonitor)
+    test "registers ControlLoop as destination for metrics", %{timer_module: timer_module} do
+      {:ok, pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
 
       state = :sys.get_state(pid)
       assert state.control_loop_pid == HendrixHomeostat.ControlLoop
@@ -77,7 +122,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
   end
 
   describe "audio processing and metrics" do
-    test "reads audio buffer and sends metrics to ControlLoop" do
+    test "reads audio buffer and sends metrics to ControlLoop", %{timer_module: timer_module} do
       parent = self()
 
       {:ok, control_loop_pid} =
@@ -87,9 +132,16 @@ defmodule HendrixHomeostat.AudioMonitorTest do
           name: HendrixHomeostat.ControlLoop
         )
 
-      {:ok, _monitor_pid} = start_supervised(AudioMonitor)
+      {:ok, monitor_pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
+
+      timer_ref = :sys.get_state(monitor_pid).timer_ref
+      timer_module.tick(timer_ref)
 
       assert_receive {:metrics_received, metrics}, 1000
+      assert_receive {:audio_metrics, ^metrics, ^monitor_pid}, 1000
 
       assert is_map(metrics)
       assert Map.has_key?(metrics, :rms)
@@ -103,7 +155,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       stop_supervised(AudioMonitor)
     end
 
-    test "updates last_metrics in state after processing" do
+    test "updates last_metrics in state after processing", %{timer_module: timer_module} do
       parent = self()
 
       {:ok, control_loop_pid} =
@@ -113,7 +165,13 @@ defmodule HendrixHomeostat.AudioMonitorTest do
           name: HendrixHomeostat.ControlLoop
         )
 
-      {:ok, monitor_pid} = start_supervised(AudioMonitor)
+      {:ok, monitor_pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
+
+      timer_ref = :sys.get_state(monitor_pid).timer_ref
+      timer_module.tick(timer_ref)
 
       assert_receive {:metrics_received, _metrics}, 1000
 
@@ -126,7 +184,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       stop_supervised(AudioMonitor)
     end
 
-    test "continues sending metrics over multiple cycles" do
+    test "continues sending metrics over multiple cycles", %{timer_module: timer_module} do
       parent = self()
 
       {:ok, control_loop_pid} =
@@ -136,9 +194,17 @@ defmodule HendrixHomeostat.AudioMonitorTest do
           name: HendrixHomeostat.ControlLoop
         )
 
-      {:ok, _monitor_pid} = start_supervised(AudioMonitor)
+      {:ok, monitor_pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
 
+      timer_ref = :sys.get_state(monitor_pid).timer_ref
+
+      timer_module.tick(timer_ref)
       assert_receive {:metrics_received, _metrics1}, 1000
+
+      timer_module.tick(timer_ref)
       assert_receive {:metrics_received, _metrics2}, 1000
 
       GenServer.stop(control_loop_pid)
@@ -147,7 +213,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
   end
 
   describe "error handling" do
-    test "handles backend initialization failure" do
+    test "handles backend initialization failure", %{timer_module: timer_module} do
       Application.put_env(:hendrix_homeostat, :audio,
         sample_rate: 48000,
         buffer_size: 4800,
@@ -155,12 +221,16 @@ defmodule HendrixHomeostat.AudioMonitorTest do
         update_rate: 10
       )
 
-      result = start_supervised(AudioMonitor)
+      result =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
 
       assert {:error, _} = result
     end
 
-    test "continues operating when backend read fails temporarily" do
+    test "continues operating when backend read fails temporarily",
+         %{timer_module: timer_module} do
       parent = self()
 
       {:ok, control_loop_pid} =
@@ -170,8 +240,14 @@ defmodule HendrixHomeostat.AudioMonitorTest do
           name: HendrixHomeostat.ControlLoop
         )
 
-      {:ok, monitor_pid} = start_supervised(AudioMonitor)
+      {:ok, monitor_pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
 
+      timer_ref = :sys.get_state(monitor_pid).timer_ref
+
+      timer_module.tick(timer_ref)
       assert_receive {:metrics_received, _metrics}, 1000
 
       assert Process.alive?(monitor_pid)
@@ -180,14 +256,18 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       stop_supervised(AudioMonitor)
     end
 
-    test "handles missing ControlLoop process gracefully" do
+    test "handles missing ControlLoop process gracefully", %{timer_module: timer_module} do
       if Process.whereis(HendrixHomeostat.ControlLoop) do
         Process.unregister(HendrixHomeostat.ControlLoop)
       end
 
-      {:ok, monitor_pid} = start_supervised(AudioMonitor)
+      {:ok, monitor_pid} =
+        start_supervised(
+          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
+        )
 
-      Process.sleep(150)
+      timer_ref = :sys.get_state(monitor_pid).timer_ref
+      timer_module.tick(timer_ref)
 
       assert Process.alive?(monitor_pid)
 

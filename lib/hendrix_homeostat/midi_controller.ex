@@ -4,14 +4,15 @@ defmodule HendrixHomeostat.MidiController do
 
   def child_spec(opts) do
     %{
-      id: __MODULE__,
+      id: Keyword.get(opts, :name, __MODULE__),
       start: {__MODULE__, :start_link, [opts]},
       shutdown: 5_000
     }
   end
 
   def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+    name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: name)
   end
 
   def send_program_change(memory_number) when memory_number >= 0 and memory_number <= 98 do
@@ -58,19 +59,21 @@ defmodule HendrixHomeostat.MidiController do
   end
 
   @impl true
-  def init(_opts) do
+  def init(opts) do
     backends = Application.fetch_env!(:hendrix_homeostat, :backends)
     midi_module = Keyword.fetch!(backends, :midi)
 
     midi_config = Application.fetch_env!(:hendrix_homeostat, :midi)
     device_name = Keyword.fetch!(midi_config, :device_name)
     channel = Keyword.fetch!(midi_config, :channel)
+    ready_notify = Keyword.get(opts, :ready_notify)
 
     state = %{
       midi: midi_module,
       device: device_name,
       channel: channel,
-      last_command: nil
+      last_command: nil,
+      ready_notify: ready_notify
     }
 
     {:ok, state, {:continue, :clear_tracks}}
@@ -82,6 +85,11 @@ defmodule HendrixHomeostat.MidiController do
     Process.sleep(1000)
     Logger.info("Clearing all RC-600 tracks on startup")
     clear_all_tracks()
+
+    if state.ready_notify do
+      send(state.ready_notify, {:midi_ready, self()})
+    end
+
     {:noreply, state}
   end
 
