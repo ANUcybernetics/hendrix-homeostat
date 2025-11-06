@@ -15,11 +15,10 @@ target =
     end
   end
 
-# Detect if we're in test environment
-env = config_env()
-
 config :hendrix_homeostat,
   target: target
+
+env = config_env()
 
 if target == :host do
   config :hendrix_homeostat,
@@ -62,7 +61,7 @@ if target == :host do
       track4_clear: 20
     ],
     backends: [
-      midi: (if env == :test, do: HendrixHomeostat.Midi.TestSpy, else: HendrixHomeostat.Midi.Fake),
+      midi: (if env == :test, do: HendrixHomeostat.Midi.TestSpy, else: HendrixHomeostat.Midi.Amidi),
       audio_backend: HendrixHomeostat.AudioBackend.File
     ]
 else

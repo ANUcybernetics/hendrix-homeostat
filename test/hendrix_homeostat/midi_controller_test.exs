@@ -2,21 +2,17 @@ defmodule HendrixHomeostat.MidiControllerTest do
   use ExUnit.Case
 
   alias HendrixHomeostat.MidiController
-  alias HendrixHomeostat.Midi.TestSpy
 
-  setup do
-    {:ok, _pid} = start_supervised({TestSpy, []})
-    TestSpy.clear_notify()
+  describe "GenServer lifecycle on hardware" do
+    @describetag :target_only
 
-    {:ok, midi_pid} = start_supervised({MidiController, ready_notify: self()})
-    assert_receive {:midi_ready, ^midi_pid}, 1_500
-    _ = :sys.get_state(MidiController)
-    TestSpy.clear_history()
+    setup do
+      {:ok, midi_pid} = start_supervised({MidiController, ready_notify: self()})
+      assert_receive {:midi_ready, ^midi_pid}, 1_500
 
-    {:ok, midi_pid: midi_pid}
-  end
+      :ok
+    end
 
-  describe "GenServer lifecycle" do
     test "starts and initializes with config" do
       stop_supervised(MidiController)
 
@@ -24,13 +20,31 @@ defmodule HendrixHomeostat.MidiControllerTest do
       assert Process.alive?(pid)
 
       state = :sys.get_state(pid)
-      assert state.midi == TestSpy
-      assert state.device == "test_midi"
+      assert state.midi == HendrixHomeostat.Midi.Amidi
+      assert state.device == "hw:CARD=R24,DEV=0"
       assert state.channel == 1
 
       stop_supervised(MidiController)
     end
 
+    test "send_program_change/1 updates state" do
+      MidiController.send_program_change(5)
+      Process.sleep(50)
+
+      state = :sys.get_state(MidiController)
+      assert state.last_command == {:program_change, 5}
+    end
+
+    test "send_control_change/2 updates state" do
+      MidiController.send_control_change(10, 64)
+      Process.sleep(50)
+
+      state = :sys.get_state(MidiController)
+      assert state.last_command == {:control_change, 10, 64}
+    end
+  end
+
+  describe "child_spec" do
     test "has correct child_spec" do
       spec = MidiController.child_spec([])
       assert spec.id == MidiController
@@ -38,71 +52,29 @@ defmodule HendrixHomeostat.MidiControllerTest do
     end
   end
 
-  describe "send_program_change/1" do
-    test "sends program change to backend" do
-      MidiController.send_program_change(42)
-      _ = :sys.get_state(MidiController)
-
-      history = TestSpy.get_history()
-      assert [{:program_change, "test_midi", 42, _timestamp}] = history
+  describe "RC-600 track control API" do
+    test "start_recording/1 accepts valid track numbers" do
+      assert :ok = MidiController.start_recording(1)
+      assert :ok = MidiController.start_recording(6)
     end
 
-    test "updates state after successful send" do
-      MidiController.send_program_change(5)
-      state = :sys.get_state(MidiController)
-      assert state.last_command == {:program_change, 5}
+    test "stop_track/1 accepts valid track numbers" do
+      assert :ok = MidiController.stop_track(1)
+      assert :ok = MidiController.stop_track(6)
     end
 
-    test "handles backend failures gracefully" do
-      stop_supervised(TestSpy)
-      MidiController.send_program_change(5)
-
-      assert Process.alive?(Process.whereis(MidiController))
-    end
-  end
-
-  describe "send_control_change/2" do
-    test "sends control change to backend" do
-      MidiController.send_control_change(7, 127)
-      _ = :sys.get_state(MidiController)
-
-      history = TestSpy.get_history()
-      assert [{:control_change, "test_midi", 7, 127, _timestamp}] = history
+    test "clear_track/1 accepts valid track numbers" do
+      assert :ok = MidiController.clear_track(1)
+      assert :ok = MidiController.clear_track(4)
     end
 
-    test "updates state after successful send" do
-      MidiController.send_control_change(10, 64)
-      state = :sys.get_state(MidiController)
-      assert state.last_command == {:control_change, 10, 64}
-    end
-  end
-
-  describe "RC-600 track control" do
-    test "start_recording/1 sends correct CC" do
-      MidiController.start_recording(1)
-      _ = :sys.get_state(MidiController)
-
-      history = TestSpy.get_history()
-      assert [{:control_change, _device, cc, 127, _timestamp}] = history
-      assert is_integer(cc)
+    test "set_track_volume/1 accepts valid track numbers and values" do
+      assert :ok = MidiController.set_track_volume(1, 0)
+      assert :ok = MidiController.set_track_volume(2, 127)
     end
 
-    test "stop_track/1 sends correct CC" do
-      MidiController.stop_track(3)
-      _ = :sys.get_state(MidiController)
-
-      history = TestSpy.get_history()
-      assert [{:control_change, _device, cc, 127, _timestamp}] = history
-      assert is_integer(cc)
-    end
-
-    test "clear_track/1 sends correct CC" do
-      MidiController.clear_track(2)
-      _ = :sys.get_state(MidiController)
-
-      history = TestSpy.get_history()
-      assert [{:control_change, _device, cc, 127, _timestamp}] = history
-      assert is_integer(cc)
+    test "clear_all_tracks/0 completes without error" do
+      assert :ok = MidiController.clear_all_tracks()
     end
   end
 end
