@@ -27,7 +27,8 @@ defmodule HendrixHomeostat.Integration.ControlLoopIntegrationTest do
 
       send(control_pid, {:metrics, %{rms: 0.92, zcr: 0.4, peak: 0.92}})
 
-      assert_receive {:midi_event, {:control_change, _device, _cc, _value, _timestamp}}, 500
+      # Wait for delayed action (max_action_delay_ms = 2000 + some buffer)
+      assert_receive {:midi_event, {:control_change, _device, _cc, _value, _timestamp}}, 3000
     end
 
     test "oscillation drives ultrastable reconfiguration" do
@@ -50,7 +51,7 @@ defmodule HendrixHomeostat.Integration.ControlLoopIntegrationTest do
     end
   end
 
-  defp assert_volume_change(timeout \\ 500) do
+  defp assert_volume_change(timeout \\ 5000) do
     deadline = System.monotonic_time(:millisecond) + timeout
     wait_for_volume_change(deadline)
   end

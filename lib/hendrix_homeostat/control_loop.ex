@@ -96,6 +96,12 @@ defmodule HendrixHomeostat.ControlLoop do
     {:noreply, %{state | config: new_config}}
   end
 
+  @impl true
+  def handle_info({:execute_delayed_action, action}, state) do
+    execute_midi_command(action, state)
+    {:noreply, state}
+  end
+
   # ============================================================================
   # Pure decision logic (easily testable)
   # ============================================================================
@@ -338,19 +344,31 @@ defmodule HendrixHomeostat.ControlLoop do
 
   defp execute_action(state, %{action: nil}), do: state
 
-  defp execute_action(state, %{action: {:stop_track, track}}) do
-    Logger.debug("Too loud (RMS: #{Float.round(state.current_rms, 3)}), stopping track #{track}")
-    HendrixHomeostat.MidiController.stop_track(track)
+  defp execute_action(state, %{action: action}) do
+    delay_ms = :rand.uniform(state.config.max_action_delay_ms + 1) - 1
+    Process.send_after(self(), {:execute_delayed_action, action}, delay_ms)
+
+    case action do
+      {:stop_track, track} ->
+        Logger.debug(
+          "Too loud (RMS: #{Float.round(state.current_rms, 3)}), scheduling stop track #{track} in #{delay_ms}ms"
+        )
+
+      {:start_recording, track} ->
+        Logger.debug(
+          "Too quiet (RMS: #{Float.round(state.current_rms, 3)}), scheduling recording on track #{track} in #{delay_ms}ms"
+        )
+    end
+
     state
   end
 
-  defp execute_action(state, %{action: {:start_recording, track}}) do
-    Logger.debug(
-      "Too quiet (RMS: #{Float.round(state.current_rms, 3)}), starting recording on track #{track}"
-    )
+  defp execute_midi_command({:stop_track, track}, _state) do
+    HendrixHomeostat.MidiController.stop_track(track)
+  end
 
+  defp execute_midi_command({:start_recording, track}, _state) do
     HendrixHomeostat.MidiController.start_recording(track)
-    state
   end
 
   defp broadcast_state(state) do

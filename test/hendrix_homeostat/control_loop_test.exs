@@ -21,6 +21,7 @@ defmodule HendrixHomeostat.ControlLoopTest do
     {:ok, _pid} = start_supervised(ControlLoop)
 
     subscribe_to_control_loop()
+    enable_midi_notifications()
 
     :ok
   end

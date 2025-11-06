@@ -19,6 +19,9 @@ defmodule HendrixHomeostat.RuntimeConfig do
       # Update oscillation threshold (how many crossings before parameter change)
       RuntimeConfig.set(:oscillation_threshold, 8)
 
+      # Update max action delay in milliseconds (adds random timing variation)
+      RuntimeConfig.set(:max_action_delay_ms, 3000)
+
       # Update multiple values at once
       RuntimeConfig.update(%{too_loud: 0.85, too_quiet: 0.08})
 
@@ -32,7 +35,8 @@ defmodule HendrixHomeostat.RuntimeConfig do
   @config_keys [
     :too_loud,
     :too_quiet,
-    :oscillation_threshold
+    :oscillation_threshold,
+    :max_action_delay_ms
   ]
 
   def child_spec(opts) do
@@ -90,6 +94,7 @@ defmodule HendrixHomeostat.RuntimeConfig do
       too_loud: Keyword.fetch!(control_config, :too_loud),
       too_quiet: Keyword.fetch!(control_config, :too_quiet),
       oscillation_threshold: Keyword.fetch!(control_config, :oscillation_threshold),
+      max_action_delay_ms: Keyword.fetch!(control_config, :max_action_delay_ms),
       defaults: control_config
     }
 
@@ -142,6 +147,7 @@ defmodule HendrixHomeostat.RuntimeConfig do
       too_loud: Keyword.fetch!(control_config, :too_loud),
       too_quiet: Keyword.fetch!(control_config, :too_quiet),
       oscillation_threshold: Keyword.fetch!(control_config, :oscillation_threshold),
+      max_action_delay_ms: Keyword.fetch!(control_config, :max_action_delay_ms),
       defaults: control_config
     }
 
@@ -180,6 +186,7 @@ defmodule HendrixHomeostat.RuntimeConfig do
     with {:ok, too_loud} <- validate_threshold(:too_loud, Map.fetch!(state, :too_loud)),
          {:ok, too_quiet} <- validate_threshold(:too_quiet, Map.fetch!(state, :too_quiet)),
          :ok <- validate_oscillation_threshold(Map.fetch!(state, :oscillation_threshold)),
+         :ok <- validate_max_action_delay_ms(Map.fetch!(state, :max_action_delay_ms)),
          true <- too_quiet < too_loud do
       :ok
     else
@@ -206,6 +213,15 @@ defmodule HendrixHomeostat.RuntimeConfig do
 
   defp validate_oscillation_threshold(_value) do
     {:error, "control.oscillation_threshold must be a positive integer"}
+  end
+
+  defp validate_max_action_delay_ms(value)
+       when is_integer(value) and value >= 0 do
+    :ok
+  end
+
+  defp validate_max_action_delay_ms(_value) do
+    {:error, "control.max_action_delay_ms must be a non-negative integer"}
   end
 
   defp notify_control_loop(state) do

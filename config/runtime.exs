@@ -37,7 +37,8 @@ if target == :host do
     control: [
       too_loud: 0.5,
       too_quiet: 0.1,
-      oscillation_threshold: 6
+      oscillation_threshold: 6,
+      max_action_delay_ms: 2000
     ],
     rc600_cc_map: [
       track1_rec_play: 1,
@@ -84,7 +85,8 @@ else
     control: [
       too_loud: 0.5,
       too_quiet: 0.1,
-      oscillation_threshold: 6
+      oscillation_threshold: 6,
+      max_action_delay_ms: 2000
     ],
     rc600_cc_map: [
       track1_rec_play: 1,

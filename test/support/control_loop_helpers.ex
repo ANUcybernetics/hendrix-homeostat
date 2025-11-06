@@ -71,4 +71,26 @@ defmodule HendrixHomeostat.ControlLoopHelpers do
 
     received_state
   end
+
+  @doc """
+  Wait for a MIDI event to be sent via the TestSpy.
+
+  ## Examples
+
+      assert_midi_event(timeout: 3000)
+  """
+  def assert_midi_event(opts \\ []) do
+    timeout = Keyword.get(opts, :timeout, 3000)
+    assert_receive {:midi_event, event}, timeout
+    event
+  end
+
+  @doc """
+  Enable MIDI event notifications for the current test process.
+
+  Call this in test setup to receive {:midi_event, event} messages.
+  """
+  def enable_midi_notifications do
+    HendrixHomeostat.Midi.TestSpy.set_notify(self())
+  end
 end
