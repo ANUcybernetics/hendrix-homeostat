@@ -61,7 +61,8 @@ if target == :host do
       track4_clear: 20
     ],
     backends: [
-      midi: (if env == :test, do: HendrixHomeostat.Midi.TestSpy, else: HendrixHomeostat.Midi.Amidi),
+      midi:
+        if(env == :test, do: HendrixHomeostat.Midi.TestSpy, else: HendrixHomeostat.Midi.Amidi),
       audio_backend: HendrixHomeostat.AudioBackend.File
     ]
 else

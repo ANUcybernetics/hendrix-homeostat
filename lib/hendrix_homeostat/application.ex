@@ -140,6 +140,12 @@ defmodule HendrixHomeostat.Application do
       clear_cc = Keyword.fetch!(cc_map, clear_key)
       validate_cc_number!(clear_key, clear_cc)
     end
+
+    for track <- 1..2 do
+      volume_key = String.to_atom("track#{track}_volume")
+      volume_cc = Keyword.fetch!(cc_map, volume_key)
+      validate_cc_number!(volume_key, volume_cc)
+    end
   end
 
   defp validate_cc_number!(name, value) do

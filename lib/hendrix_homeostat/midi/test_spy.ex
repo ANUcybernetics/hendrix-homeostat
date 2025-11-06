@@ -12,6 +12,7 @@ defmodule HendrixHomeostat.Midi.TestSpy do
       maybe_notify(state.notify, event)
       %{state | history: [event | state.history]}
     end)
+
     :ok
   end
 

@@ -78,17 +78,14 @@ defmodule HendrixHomeostat.AudioMonitorTest do
   describe "GenServer lifecycle" do
     test "starts successfully with file backend", %{timer_module: timer_module} do
       {:ok, pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
+
       assert Process.alive?(pid)
     end
 
     test "loads configuration from application environment", %{timer_module: timer_module} do
       {:ok, pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       state = :sys.get_state(pid)
       assert state.config.buffer_size == 4800
@@ -98,9 +95,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
 
     test "initializes backend and starts timer", %{timer_module: timer_module} do
       {:ok, pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       state = :sys.get_state(pid)
       assert state.backend == HendrixHomeostat.AudioBackend.File
@@ -112,9 +107,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
 
     test "registers ControlLoop as destination for metrics", %{timer_module: timer_module} do
       {:ok, pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       state = :sys.get_state(pid)
       assert state.control_loop_pid == HendrixHomeostat.ControlLoop
@@ -133,9 +126,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
         )
 
       {:ok, monitor_pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       timer_ref = :sys.get_state(monitor_pid).timer_ref
       timer_module.tick(timer_ref)
@@ -166,9 +157,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
         )
 
       {:ok, monitor_pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       timer_ref = :sys.get_state(monitor_pid).timer_ref
       timer_module.tick(timer_ref)
@@ -195,9 +184,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
         )
 
       {:ok, monitor_pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       timer_ref = :sys.get_state(monitor_pid).timer_ref
 
@@ -222,9 +209,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       )
 
       result =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       assert {:error, _} = result
     end
@@ -241,9 +226,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
         )
 
       {:ok, monitor_pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       timer_ref = :sys.get_state(monitor_pid).timer_ref
 
@@ -262,9 +245,7 @@ defmodule HendrixHomeostat.AudioMonitorTest do
       end
 
       {:ok, monitor_pid} =
-        start_supervised(
-          {AudioMonitor, timer_module: timer_module, metrics_notify: self()}
-        )
+        start_supervised({AudioMonitor, timer_module: timer_module, metrics_notify: self()})
 
       timer_ref = :sys.get_state(monitor_pid).timer_ref
       timer_module.tick(timer_ref)
