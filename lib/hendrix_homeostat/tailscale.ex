@@ -6,6 +6,8 @@ defmodule HendrixHomeostat.Tailscale do
   use GenServer
   require Logger
 
+  @compile {:no_warn_undefined, MuonTrap.Daemon}
+
   def start_link(opts) do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
@@ -36,11 +38,15 @@ defmodule HendrixHomeostat.Tailscale do
     Logger.info("Starting tailscaled daemon...")
 
     {:ok, _pid} =
-      MuonTrap.Daemon.start_link("/usr/sbin/tailscaled", [
-        "--state=#{state_dir}/tailscaled.state",
-        "--socket=#{socket_dir}/tailscaled.sock",
-        "--port=41641"
-      ])
+      MuonTrap.Daemon.start_link(
+        "/usr/sbin/tailscaled",
+        [
+          "--state=#{state_dir}/tailscaled.state",
+          "--socket=#{socket_dir}/tailscaled.sock",
+          "--port=41641"
+        ],
+        []
+      )
 
     # Give tailscaled a moment to start
     Process.sleep(2000)
