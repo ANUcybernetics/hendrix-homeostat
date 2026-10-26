@@ -34,9 +34,9 @@ defmodule HendrixHomeostat.MixProject do
       {:nerves, "~> 1.11", runtime: false},
       {:shoehorn, "~> 0.9.3"},
       {:ring_logger, "~> 0.11.4"},
-      {:toolshed, "~> 0.4.2"},
+      {:toolshed, "~> 0.5"},
       {:igniter, "~> 0.6"},
-      {:usage_rules, "~> 0.1"},
+      {:usage_rules, "~> 1.3"},
 
       # Phoenix dependencies
       {:phoenix, "~> 1.8"},
