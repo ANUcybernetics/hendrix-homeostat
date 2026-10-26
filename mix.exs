@@ -46,9 +46,9 @@ defmodule HendrixHomeostat.MixProject do
       {:bandit, "~> 1.5"},
       {:telemetry_metrics, "~> 1.0"},
       {:telemetry_poller, "~> 1.1"},
-      {:gettext, "~> 0.26"},
+      {:gettext, "~> 1.0"},
       {:jason, "~> 1.4"},
-      {:dns_cluster, "~> 0.1.3"},
+      {:dns_cluster, "~> 0.3"},
       {:esbuild, "~> 0.8", runtime: Mix.env() == :dev},
       {:tailwind, "~> 0.2", runtime: Mix.env() == :dev},
 
