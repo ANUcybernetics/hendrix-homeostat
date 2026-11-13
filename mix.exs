@@ -14,6 +14,7 @@ defmodule HendrixHomeostat.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      usage_rules: usage_rules(),
       releases: [{@app, release()}],
       preferred_cli_target: [run: :host, test: :host]
     ]
@@ -24,6 +25,23 @@ defmodule HendrixHomeostat.MixProject do
     [
       extra_applications: [:logger, :runtime_tools],
       mod: {HendrixHomeostat.Application, []}
+    ]
+  end
+
+  # `mix usage_rules.sync` writes these into .claude/skills, which is gitignored
+  defp usage_rules do
+    [
+      file: "AGENTS.md",
+      skills: [
+        location: ".claude/skills",
+        build: [
+          "phoenix-framework": [
+            description:
+              "Load before changing or debugging anything in lib/hendrix_homeostat_web/: the dashboard LiveView, function components, HEEx templates, the router or PubSub broadcasts.",
+            usage_rules: [:phoenix]
+          ]
+        ]
+      ]
     ]
   end
 
